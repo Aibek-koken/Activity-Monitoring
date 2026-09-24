@@ -94,6 +94,7 @@ Production must provide a new `JWT_SECRET`, set `SECURE_COOKIE=true`, disable de
 
 - [Project context](docs/PROJECT_CONTEXT.md)
 - [Sprint 1 code architecture](docs/CODE_ARCHITECTURE.md)
+- [Sprint 1 technical presentation](docs/EasyLang_Sprint1_Technical_Overview.pptx)
 - [Architecture decisions](docs/ARCHITECTURE.md)
 - [Sprint 1 status](docs/SPRINT_1_STATUS.md)
 - [API contract](docs/API.md)
