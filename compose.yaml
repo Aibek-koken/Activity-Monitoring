@@ -1,0 +1,21 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: easylang-postgres
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-easylang}
+      POSTGRES_USER: ${POSTGRES_USER:-easylang}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-easylang_dev_password}
+    ports:
+      # Dedicated high port avoids Postgres.app (5432) and existing projects (5433).
+      - "${POSTGRES_PORT:-55432}:5432"
+    volumes:
+      - easylang_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-easylang} -d ${POSTGRES_DB:-easylang}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  easylang_postgres_data:
