@@ -1,0 +1,16 @@
+spring:
+  datasource:
+    url: ${POSTGRES_TEST_DB_URL:jdbc:postgresql://localhost:55432/easylang_postgres_query_test}
+    username: ${POSTGRES_TEST_DB_USERNAME:easylang}
+    password: ${POSTGRES_TEST_DB_PASSWORD:easylang_dev_password}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+  flyway:
+    enabled: true
+
+app:
+  seed-demo-users: true
+  security:
+    secure-cookie: false
+    allowed-origins: http://localhost:5173,http://127.0.0.1:5173

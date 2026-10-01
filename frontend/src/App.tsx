@@ -1,6 +1,7 @@
 import { BrowserRouter, Route, Routes } from 'react-router-dom'
 import { AuthProvider } from './auth/AuthContext'
 import { ProtectedRoute } from './auth/ProtectedRoute'
+import { ResettingRouteErrorBoundary } from './components/RouteErrorBoundary'
 import { LoginPage } from './pages/LoginPage'
 import { LandingPage } from './pages/LandingPage'
 import { NotFoundPage } from './pages/NotFoundPage'
@@ -17,8 +18,10 @@ export function App() {
           <Route path="/login" element={<LoginPage />} />
 
           <Route element={<ProtectedRoute allowedRole="TRANSLATOR" />}>
-            <Route path="/translator" element={<TranslatorActivitiesPage />} />
-            <Route path="/translator/activities/:activityId" element={<TranslatorActivityDetailPage />} />
+            <Route element={<ResettingRouteErrorBoundary />}>
+              <Route path="/translator" element={<TranslatorActivitiesPage />} />
+              <Route path="/translator/activities/:activityId" element={<TranslatorActivityDetailPage />} />
+            </Route>
           </Route>
           <Route element={<ProtectedRoute allowedRole="CHIEF_EDITOR" />}>
             <Route path="/chief-editor" element={<WorkspacePage role="CHIEF_EDITOR" />} />

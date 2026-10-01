@@ -124,6 +124,12 @@ class TranslatorActivityControllerIntegrationTest {
                         .cookie(accessCookie))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.activities[*].activityName", everyItem(org.hamcrest.Matchers.is("Onboarding email sequence"))));
+
+        mockMvc.perform(get("/api/v1/translator/activities")
+                        .queryParam("q", "%")
+                        .cookie(accessCookie))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.activities.length()").value(0));
     }
 
     @Test

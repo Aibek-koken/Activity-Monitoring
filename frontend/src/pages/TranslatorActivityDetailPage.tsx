@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react
 import { AlertCircle, ArrowLeft, ClipboardList, RefreshCw, Save } from 'lucide-react'
 import { Link, useParams } from 'react-router-dom'
 import { WorkspaceLayout } from '../components/WorkspaceLayout'
-import { activityStatusLabels, formatDate, formatVolume, statusClassName } from '../lib/activity-format'
+import { activityStatusLabels, formatDate, formatVolume, formatWorkHours, statusClassName, toNumberOrNull } from '../lib/activity-format'
 import { ApiError, translatorActivityApi } from '../lib/api'
 import { latestAllowedRecordDateString, todayLocalDateString } from '../lib/date'
 import { validateRecordDate, validateTranslatedVolume, validateWorkHours } from '../lib/validation'
@@ -32,9 +32,10 @@ export function TranslatorActivityDetailPage() {
   const [isSaving, setIsSaving] = useState(false)
   const todayLocal = todayLocalDateString()
   const latestAllowedDate = latestAllowedRecordDateString()
+  const workRecords = useMemo(() => activity?.workRecords ?? [], [activity?.workRecords])
   const todayRecord = useMemo(
-    () => activity?.workRecords.find((record) => record.recordDate === todayLocal) ?? null,
-    [activity?.workRecords, todayLocal],
+    () => workRecords.find((record) => record.recordDate === todayLocal) ?? null,
+    [workRecords, todayLocal],
   )
 
   const loadActivity = useCallback(async () => {
@@ -69,8 +70,9 @@ export function TranslatorActivityDetailPage() {
 
     if (todayRecord) {
       setRecordDate(todayRecord.recordDate)
-      setTranslatedVolume(inputValue(todayRecord.translatedVolume))
-      setWorkHours(todayRecord.workHours === null ? '' : inputValue(todayRecord.workHours))
+      setTranslatedVolume(inputValue(toNumberOrNull(todayRecord.translatedVolume) ?? 0))
+      const todayWorkHours = toNumberOrNull(todayRecord.workHours)
+      setWorkHours(todayWorkHours === null ? '' : inputValue(todayWorkHours))
     } else {
       setRecordDate(todayLocal)
       setTranslatedVolume('')
@@ -303,7 +305,7 @@ export function TranslatorActivityDetailPage() {
                 <p>{activity.responsible ? 'Responsible translator' : 'Assisting translator'}</p>
               </div>
 
-              {activity.workRecords.length === 0 ? (
+              {workRecords.length === 0 ? (
                 <div className="empty-state empty-state--compact">
                   <h3>No daily records yet</h3>
                   <p>Recorded translated volume will appear here.</p>
@@ -319,11 +321,11 @@ export function TranslatorActivityDetailPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {activity.workRecords.map((record) => (
+                      {workRecords.map((record) => (
                         <tr key={record.id}>
                           <td>{formatDate(record.recordDate)}</td>
                           <td>{formatVolume(record.translatedVolume)}</td>
-                          <td>{record.workHours === null ? 'Not entered' : record.workHours.toFixed(2)}</td>
+                          <td>{formatWorkHours(record.workHours)}</td>
                         </tr>
                       ))}
                     </tbody>

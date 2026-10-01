@@ -42,9 +42,11 @@ public class TranslatorActivityService {
 
     @Transactional(readOnly = true)
     public ActivityListResponse listAssignedActivities(Long translatorId, String query) {
-        String normalizedQuery = normalizeQuery(query);
-        List<ActivitySummaryResponse> activities = activityRepository
-                .findAssignedToTranslator(translatorId, normalizedQuery)
+        String queryPattern = searchPattern(query);
+        List<Activity> assignedActivities = queryPattern == null
+                ? activityRepository.findAssignedToTranslator(translatorId)
+                : activityRepository.findAssignedToTranslatorMatching(translatorId, queryPattern);
+        List<ActivitySummaryResponse> activities = assignedActivities
                 .stream()
                 .map(activity -> toSummary(activity, translatorId))
                 .toList();
@@ -178,11 +180,18 @@ public class TranslatorActivityService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Activity not found"));
     }
 
-    private String normalizeQuery(String query) {
+    private String searchPattern(String query) {
         if (query == null || query.isBlank()) {
             return null;
         }
-        return query.trim().toLowerCase();
+        return "%" + escapeLike(query.trim().toLowerCase()) + "%";
+    }
+
+    private String escapeLike(String value) {
+        return value
+                .replace("\\", "\\\\")
+                .replace("%", "\\%")
+                .replace("_", "\\_");
     }
 
     private BigDecimal normalizeDecimal(BigDecimal value) {

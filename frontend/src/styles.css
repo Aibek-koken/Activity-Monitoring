@@ -600,6 +600,12 @@ p { margin-top: 0; }
   font-size: 12px;
 }
 
+.inline-error__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
 .translator-workspace {
   display: grid;
   gap: 18px;
@@ -624,6 +630,12 @@ p { margin-top: 0; }
   background: var(--border);
 }
 
+/* Three summary cards only: a fourth column would leave an empty grid cell
+   showing the border colour as a stray grey block. */
+.translator-metrics {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
 .translator-metrics div,
 .detail-grid div {
   min-width: 0;
@@ -641,12 +653,16 @@ p { margin-top: 0; }
 
 .translator-metrics dd,
 .detail-grid dd {
-  overflow: hidden;
   margin: 0;
   font-size: 20px;
   font-weight: 760;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  line-height: 1.25;
+}
+
+/* The volume summary carries a unit suffix, so it wraps instead of truncating. */
+.translator-metrics dd,
+.detail-grid dd:first-of-type {
+  overflow-wrap: anywhere;
 }
 
 .activity-toolbar {
@@ -1075,7 +1091,8 @@ p { margin-top: 0; }
   .workspace-grid { grid-template-columns: 1fr; }
 
   .inline-error { grid-template-columns: auto 1fr; }
-  .inline-error .button { grid-column: 1 / -1; }
+  .inline-error .button,
+  .inline-error__actions { grid-column: 1 / -1; }
 
   .translator-hero,
   .activity-toolbar,

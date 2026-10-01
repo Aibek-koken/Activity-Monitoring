@@ -16,16 +16,25 @@ public interface ActivityRepository extends JpaRepository<Activity, Long> {
             join fetch activity.project project
             join ActivityTranslator assignment on assignment.activity = activity
             where assignment.translator.id = :translatorId
+            order by activity.createdDate desc, activity.activityNumber asc
+            """)
+    List<Activity> findAssignedToTranslator(@Param("translatorId") Long translatorId);
+
+    @Query("""
+            select distinct activity
+            from Activity activity
+            join fetch activity.project project
+            join ActivityTranslator assignment on assignment.activity = activity
+            where assignment.translator.id = :translatorId
               and (
-                :query is null
-                or lower(activity.activityNumber) like lower(concat('%', :query, '%'))
-                or lower(activity.activityName) like lower(concat('%', :query, '%'))
+                lower(activity.activityNumber) like :queryPattern escape '\\'
+                or lower(activity.activityName) like :queryPattern escape '\\'
               )
             order by activity.createdDate desc, activity.activityNumber asc
             """)
-    List<Activity> findAssignedToTranslator(
+    List<Activity> findAssignedToTranslatorMatching(
             @Param("translatorId") Long translatorId,
-            @Param("query") String query
+            @Param("queryPattern") String queryPattern
     );
 
     @Query("""
