@@ -1,7 +1,8 @@
-import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
+import { BrowserRouter, Route, Routes } from 'react-router-dom'
 import { AuthProvider } from './auth/AuthContext'
 import { ProtectedRoute } from './auth/ProtectedRoute'
 import { LoginPage } from './pages/LoginPage'
+import { LandingPage } from './pages/LandingPage'
 import { NotFoundPage } from './pages/NotFoundPage'
 import { WorkspacePage } from './pages/WorkspacePage'
 
@@ -10,6 +11,7 @@ export function App() {
     <BrowserRouter>
       <AuthProvider>
         <Routes>
+          <Route path="/" element={<LandingPage />} />
           <Route path="/login" element={<LoginPage />} />
 
           <Route element={<ProtectedRoute allowedRole="TRANSLATOR" />}>
@@ -21,13 +23,9 @@ export function App() {
           <Route element={<ProtectedRoute allowedRole="PROJECT_MANAGER" />}>
             <Route path="/project-manager" element={<WorkspacePage role="PROJECT_MANAGER" />} />
           </Route>
-          <Route element={<ProtectedRoute />}>
-            <Route path="/" element={<Navigate to="/login" replace />} />
-          </Route>
           <Route path="*" element={<NotFoundPage />} />
         </Routes>
       </AuthProvider>
     </BrowserRouter>
   )
 }
-

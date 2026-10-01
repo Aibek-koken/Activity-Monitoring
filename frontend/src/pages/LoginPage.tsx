@@ -5,6 +5,7 @@ import { Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { BrandMark } from '../components/BrandMark'
 import { ApiError } from '../lib/api'
 import { roleLabels, rolePath } from '../lib/roles'
+import { validateEmail } from '../lib/validation'
 import type { Role } from '../types/auth'
 import { useAuth } from '../auth/AuthContext'
 
@@ -25,12 +26,22 @@ export function LoginPage() {
   const navigate = useNavigate()
   const location = useLocation()
   const emailRef = useRef<HTMLInputElement>(null)
+  const passwordRef = useRef<HTMLInputElement>(null)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
+
+  const clearFieldError = (field: string) => {
+    setFieldErrors((current) => {
+      if (!current[field]) return current
+      const next = { ...current }
+      delete next[field]
+      return next
+    })
+  }
 
   if (status === 'authenticated' && user) {
     return <Navigate to={rolePath(user.role)} replace />
@@ -50,11 +61,14 @@ export function LoginPage() {
     setFieldErrors({})
 
     const clientErrors: Record<string, string> = {}
-    if (!email.trim()) clientErrors.email = 'Enter your email address.'
+    const emailError = validateEmail(email)
+    if (emailError) clientErrors.email = emailError
     if (!password) clientErrors.password = 'Enter your password.'
+    if (password.length > 72) clientErrors.password = 'Password must be 72 characters or less.'
     if (Object.keys(clientErrors).length > 0) {
       setFieldErrors(clientErrors)
-      emailRef.current?.focus()
+      if (clientErrors.email) emailRef.current?.focus()
+      else passwordRef.current?.focus()
       return
     }
 
@@ -68,10 +82,15 @@ export function LoginPage() {
       navigate(destination, { replace: true })
     } catch (caught) {
       if (caught instanceof ApiError) {
+        const hasFieldErrors = Object.keys(caught.fieldErrors).length > 0
         setFormError(caught.status === 401
-          ? 'Email or password is incorrect. Check the details and try again.'
-          : caught.message)
+          ? 'We could not sign you in with these details. Check your email and password, or ask an administrator to create or activate your account.'
+          : hasFieldErrors ? null : caught.message)
         setFieldErrors(caught.fieldErrors)
+        requestAnimationFrame(() => {
+          if (caught.fieldErrors.email) emailRef.current?.focus()
+          else if (caught.fieldErrors.password) passwordRef.current?.focus()
+        })
       } else {
         setFormError('Could not reach the server. Check your connection and try again.')
       }
@@ -109,8 +128,13 @@ export function LoginPage() {
                 autoComplete="email"
                 spellCheck={false}
                 placeholder="you@easylang.local"
+                maxLength={160}
                 value={email}
-                onChange={(event) => setEmail(event.target.value)}
+                onChange={(event) => {
+                  setEmail(event.target.value)
+                  clearFieldError('email')
+                  setFormError(null)
+                }}
                 aria-invalid={fieldErrors.email ? 'true' : undefined}
                 aria-describedby={fieldErrors.email ? 'email-error' : undefined}
               />
@@ -122,12 +146,18 @@ export function LoginPage() {
               <div className="password-input">
                 <input
                   id="password"
+                  ref={passwordRef}
                   name="password"
                   type={showPassword ? 'text' : 'password'}
                   autoComplete="current-password"
                   spellCheck={false}
+                  maxLength={72}
                   value={password}
-                  onChange={(event) => setPassword(event.target.value)}
+                  onChange={(event) => {
+                    setPassword(event.target.value)
+                    clearFieldError('password')
+                    setFormError(null)
+                  }}
                   aria-invalid={fieldErrors.password ? 'true' : undefined}
                   aria-describedby={fieldErrors.password ? 'password-error' : undefined}
                 />

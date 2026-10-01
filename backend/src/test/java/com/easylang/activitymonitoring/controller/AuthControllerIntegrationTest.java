@@ -52,6 +52,13 @@ class AuthControllerIntegrationTest {
     }
 
     @Test
+    void allSeededDemoAccountsCanLoginWithOriginalPassword() throws Exception {
+        assertDemoLogin("translator@easylang.local", "TRANSLATOR");
+        assertDemoLogin("editor@easylang.local", "CHIEF_EDITOR");
+        assertDemoLogin("manager@easylang.local", "PROJECT_MANAGER");
+    }
+
+    @Test
     void invalidCredentialsAreRejectedWithGenericMessage() throws Exception {
         Csrf csrf = csrf();
 
@@ -102,6 +109,20 @@ class AuthControllerIntegrationTest {
                 .andExpect(status().isOk())
                 .andReturn();
         return result.getResponse().getCookie(JwtAuthenticationFilter.ACCESS_COOKIE_NAME);
+    }
+
+    private void assertDemoLogin(String email, String expectedRole) throws Exception {
+        Csrf csrf = csrf();
+        mockMvc.perform(post("/api/v1/auth/login")
+                        .cookie(csrf.cookie())
+                        .header(csrf.headerName(), csrf.token())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"email":"%s","password":"Demo123!"}
+                                """.formatted(email)))
+                .andExpect(status().isOk())
+                .andExpect(cookie().httpOnly(JwtAuthenticationFilter.ACCESS_COOKIE_NAME, true))
+                .andExpect(jsonPath("$.user.role").value(expectedRole));
     }
 
     private Csrf csrf() throws Exception {
