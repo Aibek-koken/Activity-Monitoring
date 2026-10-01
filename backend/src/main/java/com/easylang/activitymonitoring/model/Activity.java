@@ -75,6 +75,12 @@ public class Activity {
         return status;
     }
 
+    public void markInProgress() {
+        if (status == ActivityStatus.ASSIGNED) {
+            status = ActivityStatus.IN_PROGRESS;
+        }
+    }
+
     public LocalDate getCreatedDate() {
         return createdDate;
     }

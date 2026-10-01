@@ -8,7 +8,7 @@ export type ActivityStatus =
   | 'COMPLETED'
 
 export interface ProgressSummary {
-  totalTranslatedPages: number
+  totalTranslatedVolume: number
   recordCount: number
   lastRecordDate: string | null
 }
@@ -27,11 +27,22 @@ export interface ActivitySummary {
 export interface WorkRecord {
   id: number
   recordDate: string
-  translatedVolumePages: number
+  translatedVolume: number
   workHours: number | null
 }
 
 export interface ActivityDetail extends ActivitySummary {
   createdDate: string
   workRecords: WorkRecord[]
+}
+
+export interface CreateWorkRecordPayload {
+  recordDate: string
+  translatedVolume: number
+  workHours: number | null
+}
+
+export interface UpdateWorkRecordPayload {
+  translatedVolume: number
+  workHours: number | null
 }

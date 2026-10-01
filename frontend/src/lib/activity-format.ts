@@ -10,11 +10,11 @@ export const activityStatusLabels: Record<ActivityStatus, string> = {
   COMPLETED: 'Completed',
 }
 
-export function formatPages(value: number): string {
+export function formatVolume(value: number): string {
   return `${new Intl.NumberFormat(undefined, {
     maximumFractionDigits: 2,
     minimumFractionDigits: value % 1 === 0 ? 0 : 2,
-  }).format(value)} pages`
+  }).format(value)} volume units`
 }
 
 export function formatDate(value: string | null): string {

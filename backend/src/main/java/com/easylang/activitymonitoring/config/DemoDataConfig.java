@@ -177,7 +177,7 @@ public class DemoDataConfig implements ApplicationRunner {
             Activity activity,
             User translator,
             LocalDate recordDate,
-            BigDecimal translatedVolumePages,
+            BigDecimal translatedVolume,
             BigDecimal workHours
     ) {
         workRecordRepository.findByActivityIdAndTranslatorIdAndRecordDate(
@@ -185,7 +185,7 @@ public class DemoDataConfig implements ApplicationRunner {
                 translator.getId(),
                 recordDate
         ).orElseGet(() -> workRecordRepository.save(
-                new WorkRecord(activity, translator, recordDate, translatedVolumePages, workHours)
+                new WorkRecord(activity, translator, recordDate, translatedVolume, workHours)
         ));
     }
 

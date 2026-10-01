@@ -4,23 +4,19 @@ Last updated: 2026-10-01
 
 ## Current Summary
 
-Sprint 1 is complete locally: database-backed login, cookie JWT auth, CSRF, role-based protected workspaces, demo users, logout, and a public landing page. See `docs/SPRINT_1_STATUS.md` for the fuller acceptance record.
+Sprint 1 is complete locally: database-backed login, cookie JWT auth, CSRF, role-based protected workspaces, demo users, logout, and a public landing page. Sprint 2 Stages 1 and 2 are implemented: translators can load/search/open assigned activities, see cumulative translated-volume progress, and create or edit daily work records.
 
 ## In Progress
 
-- Documentation cleanup is in place so future sessions start from `docs/STATE.md`, `docs/ARCHITECTURE.md`, and optionally `docs/DESIGN.md`.
-- The working tree also contains recent UI/login validation changes; verify `git status` before committing.
+- Stage 2 is ready for review. Do not start Stage 3 until approved.
 
 ## Next Priorities
 
-- Keep Sprint 1 stable and documentation short.
-- For Sprint 2, add project/activity foundation only after checking the source sprint/user-story docs.
-- Add new database changes through Flyway migrations.
+- In Stage 3, run the full test pass, validate Flyway migrations against real PostgreSQL, complete UI/accessibility polish, and run the Draft QA checklist.
 
 ## Known Bugs And Risks
 
-- Local Docker databases that previously ran removed experimental migrations may need a volume reset.
-- `npx skills add anthropics/skills --skill frontend-design --agent codex` was attempted but did not complete visibly; `$frontend-design` was not visible afterwards.
+- The ERD defines `TranslatedVolume` as a float but does not name a real-world unit such as pages, words, or characters; the UI labels it as translated volume units until the domain unit is clarified.
 - Production settings still need a real JWT secret, secure cookies over HTTPS, narrowed CORS origins, and demo seeding disabled.
 
 ## Decisions Made
@@ -32,6 +28,6 @@ Sprint 1 is complete locally: database-backed login, cookie JWT auth, CSRF, role
 
 ## Last Session
 
-- Documentation cleanup updated `AGENTS.md`, `docs/ARCHITECTURE.md`, and added `docs/DESIGN.md`, `docs/STATE.md`, `docs/DECISIONS.md`.
-- Stale onboarding guidance was consolidated into `AGENTS.md`; deeper docs are now references to open only when needed.
-- No application behavior was intentionally changed by this documentation pass.
+- Sprint 2 Stage 1 added Flyway-managed project/activity/assignment/work-record schema, idempotent non-prod demo data, translator read APIs, translator activity list/detail pages, search, progress summaries, and server-side translator ownership checks.
+- Cleanup before Stage 2 confirmed docs already use `mvn`, added a second demo translator assignment for ownership checks, and added read-page frontend tests.
+- Sprint 2 Stage 2 added create/edit daily work record APIs, backend validation for decimal volume/work hours and future dates, duplicate-date protection, progress recalculation from cumulative translated volume, and a translator detail-page record form with loading, validation, error, and success states.

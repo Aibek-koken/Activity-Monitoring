@@ -1,5 +1,10 @@
 import type { Role, User, WorkspaceData } from '../types/auth'
-import type { ActivityDetail, ActivitySummary } from '../types/activity'
+import type {
+  ActivityDetail,
+  ActivitySummary,
+  CreateWorkRecordPayload,
+  UpdateWorkRecordPayload,
+} from '../types/activity'
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? '/api'
 
@@ -101,5 +106,27 @@ export const translatorActivityApi = {
 
   get(activityId: number): Promise<ActivityDetail> {
     return request<ActivityDetail>(`/v1/translator/activities/${activityId}`)
+  },
+
+  async createWorkRecord(activityId: number, payload: CreateWorkRecordPayload): Promise<ActivityDetail> {
+    const csrfToken = await csrf()
+    return request<ActivityDetail>(`/v1/translator/activities/${activityId}/work-records`, {
+      method: 'POST',
+      headers: { [csrfToken.headerName]: csrfToken.token },
+      body: JSON.stringify(payload),
+    })
+  },
+
+  async updateWorkRecord(
+    activityId: number,
+    recordId: number,
+    payload: UpdateWorkRecordPayload,
+  ): Promise<ActivityDetail> {
+    const csrfToken = await csrf()
+    return request<ActivityDetail>(`/v1/translator/activities/${activityId}/work-records/${recordId}`, {
+      method: 'PUT',
+      headers: { [csrfToken.headerName]: csrfToken.token },
+      body: JSON.stringify(payload),
+    })
   },
 }

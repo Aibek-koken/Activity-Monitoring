@@ -18,17 +18,19 @@ public interface WorkRecordRepository extends JpaRepository<WorkRecord, Long> {
             LocalDate recordDate
     );
 
+    Optional<WorkRecord> findByIdAndActivityIdAndTranslatorId(Long id, Long activityId, Long translatorId);
+
     Optional<WorkRecord> findTopByActivityIdAndTranslatorIdOrderByRecordDateDescIdDesc(Long activityId, Long translatorId);
 
     long countByActivityIdAndTranslatorId(Long activityId, Long translatorId);
 
     @Query("""
-            select coalesce(sum(record.translatedVolumePages), 0)
+            select coalesce(sum(record.translatedVolume), 0)
             from WorkRecord record
             where record.activity.id = :activityId
               and record.translator.id = :translatorId
             """)
-    BigDecimal sumTranslatedVolumePages(
+    BigDecimal sumTranslatedVolume(
             @Param("activityId") Long activityId,
             @Param("translatorId") Long translatorId
     );

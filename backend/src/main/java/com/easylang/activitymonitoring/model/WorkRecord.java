@@ -39,8 +39,8 @@ public class WorkRecord {
     @Column(name = "record_date", nullable = false)
     private LocalDate recordDate;
 
-    @Column(name = "translated_volume_pages", nullable = false, precision = 10, scale = 2)
-    private BigDecimal translatedVolumePages;
+    @Column(name = "translated_volume", nullable = false, precision = 10, scale = 2)
+    private BigDecimal translatedVolume;
 
     @Column(name = "work_hours", precision = 5, scale = 2)
     private BigDecimal workHours;
@@ -58,14 +58,20 @@ public class WorkRecord {
             Activity activity,
             User translator,
             LocalDate recordDate,
-            BigDecimal translatedVolumePages,
+            BigDecimal translatedVolume,
             BigDecimal workHours
     ) {
         this.activity = activity;
         this.translator = translator;
         this.recordDate = recordDate;
-        this.translatedVolumePages = translatedVolumePages;
+        this.translatedVolume = translatedVolume;
         this.workHours = workHours;
+    }
+
+    public void updateWork(BigDecimal translatedVolume, BigDecimal workHours) {
+        this.translatedVolume = translatedVolume;
+        this.workHours = workHours;
+        this.updatedAt = Instant.now();
     }
 
     public Long getId() {
@@ -84,8 +90,8 @@ public class WorkRecord {
         return recordDate;
     }
 
-    public BigDecimal getTranslatedVolumePages() {
-        return translatedVolumePages;
+    public BigDecimal getTranslatedVolume() {
+        return translatedVolume;
     }
 
     public BigDecimal getWorkHours() {

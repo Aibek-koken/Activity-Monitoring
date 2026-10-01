@@ -47,13 +47,13 @@ CREATE TABLE work_records (
     activity_id BIGINT NOT NULL REFERENCES activities (id) ON DELETE CASCADE,
     translator_id BIGINT NOT NULL REFERENCES app_users (id),
     record_date DATE NOT NULL,
-    translated_volume_pages NUMERIC(10, 2) NOT NULL,
+    translated_volume NUMERIC(10, 2) NOT NULL,
     work_hours NUMERIC(5, 2),
     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT uq_work_records_activity_translator_date UNIQUE (activity_id, translator_id, record_date),
-    CONSTRAINT ck_work_records_translated_volume_pages CHECK (
-        translated_volume_pages > 0 AND translated_volume_pages <= 1000
+    CONSTRAINT ck_work_records_translated_volume CHECK (
+        translated_volume > 0 AND translated_volume <= 1000
     ),
     CONSTRAINT ck_work_records_work_hours CHECK (
         work_hours IS NULL OR (work_hours >= 0 AND work_hours <= 24)

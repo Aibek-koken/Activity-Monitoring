@@ -3,7 +3,7 @@ import { AlertCircle, ClipboardList, RefreshCw, Search } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
 import { WorkspaceLayout } from '../components/WorkspaceLayout'
-import { activityStatusLabels, formatDate, formatPages, statusClassName } from '../lib/activity-format'
+import { activityStatusLabels, formatDate, formatVolume, statusClassName } from '../lib/activity-format'
 import { translatorActivityApi } from '../lib/api'
 import type { ActivitySummary } from '../types/activity'
 
@@ -36,11 +36,11 @@ export function TranslatorActivitiesPage() {
   }, [loadActivities, query])
 
   const metrics = useMemo(() => {
-    const totalPages = activities.reduce((sum, activity) => sum + activity.progress.totalTranslatedPages, 0)
+    const totalVolume = activities.reduce((sum, activity) => sum + activity.progress.totalTranslatedVolume, 0)
     return {
       assigned: activities.length,
       inProgress: activities.filter((activity) => activity.status === 'IN_PROGRESS').length,
-      totalPages,
+      totalVolume,
     }
   }, [activities])
 
@@ -74,7 +74,7 @@ export function TranslatorActivitiesPage() {
           </div>
           <div>
             <dt>Translated</dt>
-            <dd>{formatPages(metrics.totalPages)}</dd>
+            <dd>{formatVolume(metrics.totalVolume)}</dd>
           </div>
         </section>
 
@@ -141,7 +141,7 @@ export function TranslatorActivitiesPage() {
                   <span>{activity.responsible ? 'Responsible' : 'Assisting'}</span>
                 </span>
                 <span className="activity-row__progress">
-                  <strong>{formatPages(activity.progress.totalTranslatedPages)}</strong>
+                  <strong>{formatVolume(activity.progress.totalTranslatedVolume)}</strong>
                   <span>{formatDate(activity.progress.lastRecordDate)}</span>
                 </span>
               </Link>
