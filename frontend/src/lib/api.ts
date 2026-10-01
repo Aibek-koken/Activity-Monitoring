@@ -1,4 +1,5 @@
 import type { Role, User, WorkspaceData } from '../types/auth'
+import type { ActivityDetail, ActivitySummary } from '../types/activity'
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? '/api'
 
@@ -91,3 +92,14 @@ export const workspaceApi = {
   },
 }
 
+export const translatorActivityApi = {
+  list(query = ''): Promise<{ activities: ActivitySummary[] }> {
+    const search = query.trim()
+    const suffix = search ? `?${new URLSearchParams({ q: search }).toString()}` : ''
+    return request<{ activities: ActivitySummary[] }>(`/v1/translator/activities${suffix}`)
+  },
+
+  get(activityId: number): Promise<ActivityDetail> {
+    return request<ActivityDetail>(`/v1/translator/activities/${activityId}`)
+  },
+}

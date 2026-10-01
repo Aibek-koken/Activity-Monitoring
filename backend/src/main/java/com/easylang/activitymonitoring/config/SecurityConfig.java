@@ -55,6 +55,7 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers("/api/v1/auth/login", "/api/v1/auth/csrf", "/actuator/health").permitAll()
+                        .requestMatchers("/api/v1/translator/**").hasRole("TRANSLATOR")
                         .requestMatchers("/api/v1/workspaces/translator/**").hasRole("TRANSLATOR")
                         .requestMatchers("/api/v1/workspaces/chief-editor/**").hasRole("CHIEF_EDITOR")
                         .requestMatchers("/api/v1/workspaces/project-manager/**").hasRole("PROJECT_MANAGER")

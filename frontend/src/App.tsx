@@ -4,6 +4,8 @@ import { ProtectedRoute } from './auth/ProtectedRoute'
 import { LoginPage } from './pages/LoginPage'
 import { LandingPage } from './pages/LandingPage'
 import { NotFoundPage } from './pages/NotFoundPage'
+import { TranslatorActivitiesPage } from './pages/TranslatorActivitiesPage'
+import { TranslatorActivityDetailPage } from './pages/TranslatorActivityDetailPage'
 import { WorkspacePage } from './pages/WorkspacePage'
 
 export function App() {
@@ -15,7 +17,8 @@ export function App() {
           <Route path="/login" element={<LoginPage />} />
 
           <Route element={<ProtectedRoute allowedRole="TRANSLATOR" />}>
-            <Route path="/translator" element={<WorkspacePage role="TRANSLATOR" />} />
+            <Route path="/translator" element={<TranslatorActivitiesPage />} />
+            <Route path="/translator/activities/:activityId" element={<TranslatorActivityDetailPage />} />
           </Route>
           <Route element={<ProtectedRoute allowedRole="CHIEF_EDITOR" />}>
             <Route path="/chief-editor" element={<WorkspacePage role="CHIEF_EDITOR" />} />
