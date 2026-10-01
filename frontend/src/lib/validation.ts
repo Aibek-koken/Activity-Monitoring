@@ -16,9 +16,9 @@ export function validateLoginPassword(value: string): string | null {
   return null
 }
 
-export function validateRecordDate(value: string, todayUtc: string): string | null {
+export function validateRecordDate(value: string, latestAllowedDate: string): string | null {
   if (!value) return 'Choose a record date.'
-  if (value > todayUtc) return 'Record date cannot be in the future.'
+  if (value > latestAllowedDate) return 'Record date cannot be in the future.'
   return null
 }
 

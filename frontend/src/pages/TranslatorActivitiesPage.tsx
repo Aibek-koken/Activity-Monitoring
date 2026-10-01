@@ -63,7 +63,7 @@ export function TranslatorActivitiesPage() {
           </div>
         </section>
 
-        <section className="translator-metrics" aria-label="Activity summary">
+        <dl className="translator-metrics" aria-label="Activity summary">
           <div>
             <dt>Assigned</dt>
             <dd>{metrics.assigned}</dd>
@@ -76,7 +76,7 @@ export function TranslatorActivitiesPage() {
             <dt>Translated</dt>
             <dd>{formatVolume(metrics.totalVolume)}</dd>
           </div>
-        </section>
+        </dl>
 
         <section className="activity-toolbar" aria-label="Search assigned activities">
           <label className="search-field" htmlFor="activity-search">

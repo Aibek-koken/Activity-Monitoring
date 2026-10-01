@@ -4,7 +4,7 @@ import { Link, useParams } from 'react-router-dom'
 import { WorkspaceLayout } from '../components/WorkspaceLayout'
 import { activityStatusLabels, formatDate, formatVolume, statusClassName } from '../lib/activity-format'
 import { ApiError, translatorActivityApi } from '../lib/api'
-import { todayUtcDateString } from '../lib/date'
+import { latestAllowedRecordDateString, todayLocalDateString } from '../lib/date'
 import { validateRecordDate, validateTranslatedVolume, validateWorkHours } from '../lib/validation'
 import type { ActivityDetail } from '../types/activity'
 
@@ -30,10 +30,11 @@ export function TranslatorActivityDetailPage() {
   const [formError, setFormError] = useState<string | null>(null)
   const [formSuccess, setFormSuccess] = useState<string | null>(null)
   const [isSaving, setIsSaving] = useState(false)
-  const todayUtc = todayUtcDateString()
+  const todayLocal = todayLocalDateString()
+  const latestAllowedDate = latestAllowedRecordDateString()
   const todayRecord = useMemo(
-    () => activity?.workRecords.find((record) => record.recordDate === todayUtc) ?? null,
-    [activity?.workRecords, todayUtc],
+    () => activity?.workRecords.find((record) => record.recordDate === todayLocal) ?? null,
+    [activity?.workRecords, todayLocal],
   )
 
   const loadActivity = useCallback(async () => {
@@ -71,13 +72,13 @@ export function TranslatorActivityDetailPage() {
       setTranslatedVolume(inputValue(todayRecord.translatedVolume))
       setWorkHours(todayRecord.workHours === null ? '' : inputValue(todayRecord.workHours))
     } else {
-      setRecordDate(todayUtc)
+      setRecordDate(todayLocal)
       setTranslatedVolume('')
       setWorkHours('')
     }
     setFieldErrors({})
     setFormError(null)
-  }, [activity, todayRecord, todayUtc])
+  }, [activity, todayRecord, todayLocal])
 
   const clearFieldError = (field: keyof RecordFieldErrors) => {
     setFieldErrors((current) => {
@@ -94,7 +95,7 @@ export function TranslatorActivityDetailPage() {
     if (!activity) return
 
     const nextErrors: RecordFieldErrors = {
-      recordDate: todayRecord ? undefined : validateRecordDate(recordDate, todayUtc) ?? undefined,
+      recordDate: todayRecord ? undefined : validateRecordDate(recordDate, latestAllowedDate) ?? undefined,
       translatedVolume: validateTranslatedVolume(translatedVolume) ?? undefined,
       workHours: validateWorkHours(workHours) ?? undefined,
     }
@@ -126,7 +127,7 @@ export function TranslatorActivityDetailPage() {
       if (saveError instanceof ApiError) {
         setFieldErrors(saveError.fieldErrors)
         setFormError(saveError.message)
-        if (saveError.status === 409 && recordDate === todayUtc) {
+        if (saveError.status === 409 && recordDate === todayLocal) {
           await loadActivity()
           setFormError('A record for today already exists. Review it and save changes.')
         }
@@ -192,7 +193,7 @@ export function TranslatorActivityDetailPage() {
               </div>
             </header>
 
-            <section className="detail-grid" aria-label="Activity progress">
+            <dl className="detail-grid" aria-label="Activity progress">
               <div>
                 <dt>Translated</dt>
                 <dd>{formatVolume(activity.progress.totalTranslatedVolume)}</dd>
@@ -209,7 +210,7 @@ export function TranslatorActivityDetailPage() {
                 <dt>Assigned</dt>
                 <dd>{formatDate(activity.assignedDate)}</dd>
               </div>
-            </section>
+            </dl>
 
             <section className="work-record-panel" aria-labelledby="record-form-title">
               <div className="section-heading">
@@ -219,7 +220,7 @@ export function TranslatorActivityDetailPage() {
 
               <form className="work-record-form" noValidate onSubmit={(event) => void handleRecordSubmit(event)}>
                 <div className="field-group">
-                  <label htmlFor="record-date">Record date (UTC)</label>
+                  <label htmlFor="record-date">Record date</label>
                   {todayRecord ? (
                     <input
                       className="readonly-field"
@@ -234,7 +235,7 @@ export function TranslatorActivityDetailPage() {
                       aria-invalid={fieldErrors.recordDate ? 'true' : 'false'}
                       disabled={isSaving}
                       id="record-date"
-                      max={todayUtc}
+                      max={latestAllowedDate}
                       onChange={(event) => {
                         setRecordDate(event.target.value)
                         clearFieldError('recordDate')
@@ -293,7 +294,7 @@ export function TranslatorActivityDetailPage() {
               </form>
 
               {formError && <p className="form-alert" role="alert">{formError}</p>}
-              {formSuccess && <p className="form-success" role="status">{formSuccess}</p>}
+              {formSuccess && <p aria-live="polite" className="form-success" role="status">{formSuccess}</p>}
             </section>
 
             <section className="record-section" aria-labelledby="history-title">

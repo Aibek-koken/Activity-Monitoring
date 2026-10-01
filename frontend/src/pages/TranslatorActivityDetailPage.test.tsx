@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { translatorActivityApi } from '../lib/api'
-import { todayUtcDateString } from '../lib/date'
+import { todayLocalDateString } from '../lib/date'
 import type { ActivityDetail } from '../types/activity'
 import { TranslatorActivityDetailPage } from './TranslatorActivityDetailPage'
 
@@ -141,18 +141,18 @@ describe('TranslatorActivityDetailPage', () => {
 
   it('creates a daily record and shows success', async () => {
     const user = userEvent.setup()
-    const todayUtc = todayUtcDateString()
+    const todayLocal = todayLocalDateString()
     const updatedActivity: ActivityDetail = {
       ...baseActivity,
       progress: {
-        lastRecordDate: todayUtc,
+        lastRecordDate: todayLocal,
         recordCount: 1,
         totalTranslatedVolume: 4.5,
       },
       status: 'IN_PROGRESS',
       workRecords: [{
         id: 501,
-        recordDate: todayUtc,
+        recordDate: todayLocal,
         translatedVolume: 4.5,
         workHours: null,
       }],
@@ -168,7 +168,7 @@ describe('TranslatorActivityDetailPage', () => {
 
     expect(await screen.findByRole('status')).toHaveTextContent('Daily record saved.')
     expect(translatorActivityApi.createWorkRecord).toHaveBeenCalledWith(101, {
-      recordDate: todayUtc,
+      recordDate: todayLocal,
       translatedVolume: 4.5,
       workHours: null,
     })

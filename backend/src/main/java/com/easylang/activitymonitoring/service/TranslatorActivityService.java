@@ -167,8 +167,8 @@ public class TranslatorActivityService {
     }
 
     private void rejectFutureDate(LocalDate recordDate) {
-        LocalDate todayUtc = LocalDate.now(ZoneOffset.UTC);
-        if (recordDate.isAfter(todayUtc)) {
+        LocalDate latestAllowedDate = LocalDate.now(ZoneOffset.ofHours(14));
+        if (recordDate.isAfter(latestAllowedDate)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Record date cannot be in the future");
         }
     }

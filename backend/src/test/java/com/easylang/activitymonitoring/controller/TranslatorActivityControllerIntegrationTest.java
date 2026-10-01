@@ -9,13 +9,21 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.easylang.activitymonitoring.model.Activity;
+import com.easylang.activitymonitoring.model.ActivityTranslator;
+import com.easylang.activitymonitoring.model.User;
+import com.easylang.activitymonitoring.model.WorkRecord;
 import com.easylang.activitymonitoring.repository.ActivityRepository;
+import com.easylang.activitymonitoring.repository.ActivityTranslatorRepository;
 import com.easylang.activitymonitoring.repository.UserRepository;
 import com.easylang.activitymonitoring.repository.WorkRecordRepository;
 import com.easylang.activitymonitoring.security.JwtAuthenticationFilter;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.Cookie;
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.ZoneOffset;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -40,6 +48,9 @@ class TranslatorActivityControllerIntegrationTest {
 
     @Autowired
     private ActivityRepository activityRepository;
+
+    @Autowired
+    private ActivityTranslatorRepository activityTranslatorRepository;
 
     @Autowired
     private UserRepository userRepository;
@@ -157,6 +168,20 @@ class TranslatorActivityControllerIntegrationTest {
     }
 
     @Test
+    void createDailyWorkRecordWithoutCsrfIsRejected() throws Exception {
+        Cookie accessCookie = login("translator@easylang.local");
+        Long activityId = activityRepository.findByActivityNumber("EL-2026-002").orElseThrow().getId();
+
+        mockMvc.perform(post("/api/v1/translator/activities/{activityId}/work-records", activityId)
+                        .cookie(accessCookie)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"recordDate":"2026-09-27","translatedVolume":4.50}
+                                """))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
     void translatorCanCreateDailyWorkRecordAndProgressUpdates() throws Exception {
         Cookie accessCookie = login("translator@easylang.local");
         Csrf csrf = csrf();
@@ -176,6 +201,24 @@ class TranslatorActivityControllerIntegrationTest {
                 .andExpect(jsonPath("$.progress.lastRecordDate").value("2026-09-27"))
                 .andExpect(jsonPath("$.workRecords[0].translatedVolume").value(4.50))
                 .andExpect(jsonPath("$.workRecords[0].workHours").value(1.25));
+    }
+
+    @Test
+    void translatorCanCreateWorkRecordForUtcPlus14Today() throws Exception {
+        Cookie accessCookie = login("translator@easylang.local");
+        Csrf csrf = csrf();
+        Long activityId = activityRepository.findByActivityNumber("EL-2026-002").orElseThrow().getId();
+        LocalDate latestAllowedDate = LocalDate.now(ZoneOffset.ofHours(14));
+
+        mockMvc.perform(post("/api/v1/translator/activities/{activityId}/work-records", activityId)
+                        .cookie(accessCookie, csrf.cookie())
+                        .header(csrf.headerName(), csrf.token())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"recordDate":"%s","translatedVolume":4.50}
+                                """.formatted(latestAllowedDate)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.progress.lastRecordDate").value(latestAllowedDate.toString()));
     }
 
     @Test
@@ -200,16 +243,99 @@ class TranslatorActivityControllerIntegrationTest {
         Cookie accessCookie = login("translator@easylang.local");
         Csrf csrf = csrf();
         Long activityId = activityRepository.findByActivityNumber("EL-2026-002").orElseThrow().getId();
+        LocalDate tooFarAhead = LocalDate.now(ZoneOffset.ofHours(14)).plusDays(1);
 
         mockMvc.perform(post("/api/v1/translator/activities/{activityId}/work-records", activityId)
                         .cookie(accessCookie, csrf.cookie())
                         .header(csrf.headerName(), csrf.token())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"recordDate":"2999-01-01","translatedVolume":3.00}
-                                """))
+                                {"recordDate":"%s","translatedVolume":3.00}
+                                """.formatted(tooFarAhead)))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message").value("Record date cannot be in the future"));
+    }
+
+    @Test
+    void editDailyWorkRecordWithoutCsrfIsRejected() throws Exception {
+        Cookie accessCookie = login("translator@easylang.local");
+        Long activityId = activityRepository.findByActivityNumber("EL-2026-001").orElseThrow().getId();
+        Long recordId = workRecordRepository
+                .findByActivityIdAndTranslatorIdAndRecordDate(
+                        activityId,
+                        userRepository.findByEmailIgnoreCase("translator@easylang.local").orElseThrow().getId(),
+                        LocalDate.of(2026, 9, 30)
+                )
+                .orElseThrow()
+                .getId();
+
+        mockMvc.perform(put("/api/v1/translator/activities/{activityId}/work-records/{recordId}", activityId, recordId)
+                        .cookie(accessCookie)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"translatedVolume":6.75}
+                                """))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void translatorCannotEditAnotherTranslatorsRecord() throws Exception {
+        Cookie accessCookie = login("translator@easylang.local");
+        Csrf csrf = csrf();
+        Activity activity = activityRepository.findByActivityNumber("EL-2026-001").orElseThrow();
+        User secondTranslator = userRepository.findByEmailIgnoreCase("translator2@easylang.local").orElseThrow();
+
+        activityTranslatorRepository.save(new ActivityTranslator(
+                activity,
+                secondTranslator,
+                false,
+                LocalDate.of(2026, 9, 28)
+        ));
+        WorkRecord otherTranslatorRecord = workRecordRepository.saveAndFlush(new WorkRecord(
+                activity,
+                secondTranslator,
+                LocalDate.of(2026, 9, 28),
+                new BigDecimal("3.00"),
+                null
+        ));
+
+        mockMvc.perform(put(
+                        "/api/v1/translator/activities/{activityId}/work-records/{recordId}",
+                        activity.getId(),
+                        otherTranslatorRecord.getId()
+                )
+                        .cookie(accessCookie, csrf.cookie())
+                        .header(csrf.headerName(), csrf.token())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"translatedVolume":6.75}
+                                """))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void translatorCannotEditRecordThroughDifferentActivity() throws Exception {
+        Cookie accessCookie = login("translator@easylang.local");
+        Csrf csrf = csrf();
+        Long activityId = activityRepository.findByActivityNumber("EL-2026-001").orElseThrow().getId();
+        Long otherActivityId = activityRepository.findByActivityNumber("EL-2026-003").orElseThrow().getId();
+        Long recordId = workRecordRepository
+                .findByActivityIdAndTranslatorIdAndRecordDate(
+                        otherActivityId,
+                        userRepository.findByEmailIgnoreCase("translator@easylang.local").orElseThrow().getId(),
+                        LocalDate.of(2026, 9, 30)
+                )
+                .orElseThrow()
+                .getId();
+
+        mockMvc.perform(put("/api/v1/translator/activities/{activityId}/work-records/{recordId}", activityId, recordId)
+                        .cookie(accessCookie, csrf.cookie())
+                        .header(csrf.headerName(), csrf.token())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"translatedVolume":6.75}
+                                """))
+                .andExpect(status().isNotFound());
     }
 
     @Test
@@ -243,7 +369,7 @@ class TranslatorActivityControllerIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"translatedVolume":6.75,"workHours":1.50}
-                """))
+                                """))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.progress.totalTranslatedVolume").value(6.75))
                 .andExpect(jsonPath("$.progress.recordCount").value(1))
