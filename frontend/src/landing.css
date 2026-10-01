@@ -62,7 +62,6 @@
 
 .landing-nav__actions { display: flex; justify-content: flex-end; gap: 8px; }
 .landing-hero .button--primary { color: var(--landing-dark); background: var(--surface); }
-.landing-sign-in { color: var(--landing-soft); }
 
 .landing-hero__content {
   position: relative;
@@ -236,8 +235,7 @@
 @media (max-width: 600px) {
   .landing-container { width: min(calc(100% - 32px), 520px); }
   .landing-nav { min-height: 78px; }
-  .landing-nav .brand-mark__copy small,
-  .landing-nav .landing-sign-in { display: none; }
+  .landing-nav .brand-mark__copy small { display: none; }
   .landing-hero__content { padding-block: 58px 84px; }
   .landing-eyebrow { align-items: flex-start; font-size: 10px; line-height: 1.5; }
   .landing-eyebrow__dot { margin-top: 4px; }

@@ -81,7 +81,6 @@ export function LandingPage() {
           </nav>
 
           <div className="landing-nav__actions">
-            <Link className="button button--ghost landing-sign-in" to="/login">Sign in</Link>
             <Link className="button button--primary" to="/login">
               Sign in
               <ArrowRight size={17} aria-hidden="true" />

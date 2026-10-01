@@ -1,62 +1,49 @@
 # AGENTS.md
 
-## Project purpose
+EasyLang Activity Monitoring is a Spring Boot + React/Vite monorepo for a translation-house activity monitoring system. Sprint 1 implements authentication, role-based access, protected starter workspaces, and a public landing page.
 
-EasyLang Activity Monitoring helps a translation house identify activities that are likely to finish late. The long-term product supports Translators, Chief Editors, and Project Managers. Sprint 1 implements the shared authentication and authorization foundation only.
+## Read First
 
-Read `docs/PROJECT_CONTEXT.md`, `docs/CODE_ARCHITECTURE.md`, `docs/ARCHITECTURE.md`, and `docs/SPRINT_1_STATUS.md` before changing behavior or scope.
+1. `docs/STATE.md`
+2. `docs/ARCHITECTURE.md`
+3. For UI/UX work, also read `docs/DESIGN.md` and use `$frontend-design`.
 
-## Repository boundaries
-
-- Keep backend code under `backend/` and frontend code under `frontend/`.
-- Keep the backend layer boundaries explicit: HTTP handling in `controller`, use cases in `service`, persistence in `repository`, entities/enums in `model`, API shapes in `dto`, and authentication mechanics in `security`.
-- Controllers must not query repositories directly; route business operations through a service.
-- Do not place business logic in React components. The backend remains the authority for authentication, authorization, and domain rules.
-- Keep modules inside the Spring Boot application until measured scaling or deployment requirements justify extraction. Kafka, Redis, and Kubernetes are future infrastructure options, not current dependencies.
-- Add database changes through new Flyway migrations. Never edit an applied migration after it has been shared.
-- Use semantic CSS variables from `frontend/src/styles.css`; follow `brand.md` and do not copy the old presentation prototype literally.
-
-## Security rules
-
-- Never store JWTs in localStorage or sessionStorage. Authentication uses an `HttpOnly` cookie.
-- Keep CSRF protection enabled for state-changing requests.
-- Enforce roles on the backend even when a frontend route guard exists.
-- Return generic login failures so the API does not disclose whether an email exists.
-- Never commit real secrets or production credentials.
+Open other files only when the task needs them. Do not read the whole repo by default.
 
 ## Commands
 
-Backend:
+- Backend: `cd backend && mvn test`; `cd backend && mvn spring-boot:run`.
+- Frontend: `cd frontend && npm install`; `npm test`; `npm run lint`; `npm run build`; `npm run dev`.
+- DB: `docker compose up -d --wait`.
+- E2E after DB/API/web are running: `cd frontend && npm run test:e2e`.
 
-```bash
-cd backend
-mvn test
-mvn spring-boot:run
-```
+## Coding Rules
 
-Frontend:
+- Keep backend under `backend/` and frontend under `frontend/`.
+- Keep backend layers explicit: HTTP in controllers, use cases in services, persistence in repositories, entities/enums in models, API shapes in DTOs, auth mechanics in security/config.
+- Controllers must not query repositories directly.
+- Do not put business rules in React components; backend remains authority for auth, authorization, validation, and domain rules.
+- Add schema changes with new Flyway migrations; never edit a shared/applied migration.
+- Never store JWTs in `localStorage` or `sessionStorage`; auth uses an `HttpOnly` cookie.
+- Keep CSRF enabled for state-changing requests.
+- Enforce roles on the backend even when frontend route guards exist.
+- Return generic login failures; do not reveal whether an email exists.
+- Never commit real secrets or production credentials.
+- Use semantic CSS variables from `frontend/src/styles.css`; do not invent a new visual system.
 
-```bash
-cd frontend
-npm install
-npm test
-npm run lint
-npm run build
-npm run dev
-```
+## Token-Saving Rules
 
-End-to-end, after the database and both applications are running:
+- Use `rg`/search to find the files needed for the task.
+- Do not re-read large files without a reason.
+- One session handles one task; update `docs/STATE.md` at the end of every session.
 
-```bash
-cd frontend
-npm run test:e2e
-```
+## Where To Find Deeper Docs
 
-## Definition of done for future work
-
-- Requirements and role boundaries are traceable to a user story.
-- Backend endpoints have positive and negative authorization tests.
-- Frontend has loading, error, empty, and success states where applicable.
-- Keyboard focus, labels, target sizes, responsive behavior, and reduced-motion preferences are checked.
-- `mvn test`, `npm test`, `npm run lint`, `npm run build`, and relevant browser tests pass.
-- Update the appropriate file in `docs/` with decisions, delivered scope, and known follow-up work.
+- ERD: `../3.3_Database_Design.md` — open only when the task needs it.
+- User stories: `../Project 3_Practice CSS 342_01_p User_Stories.xlsx` — open only when the task needs it.
+- Sprint docs: `../EasyLang - Technical Specification & Sprint 1 Plan.pdf`, `../Project 3_Practice CSS 342_01_p Spints.pdf` — open only when the task needs it.
+- `docs/API.md` — open only when the task needs it.
+- `docs/run.md` — open only when the task needs it.
+- `docs/PROJECT_CONTEXT.md` — open only when the task needs it.
+- `docs/CODE_ARCHITECTURE.md` — open only when the task needs it.
+- `docs/SPRINT_1_STATUS.md` — open only when the task needs it.

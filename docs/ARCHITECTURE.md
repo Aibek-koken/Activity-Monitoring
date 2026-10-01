@@ -1,61 +1,47 @@
-# Architecture Decisions
+# Architecture
 
-Last updated: 2026-09-22
+Last updated: 2026-10-01
 
-## System shape
+## Project Map
 
-The project follows the three-tier architecture in the source documents:
+- `backend/` is a Spring Boot 3 API. Entry point: `ActivityMonitoringApplication`.
+- `frontend/` is a React + TypeScript Vite app. Entry points: `frontend/src/main.tsx` and `frontend/src/App.tsx`.
+- `compose.yaml` runs local PostgreSQL on host port `55432`.
+- `backend/src/main/resources/db/migration/` contains Flyway migrations; current Sprint 1 schema is `app_users`.
+- `docs/` contains handoff, architecture, design, API, status, and run notes.
 
-```text
-React web client
-       |
-       | HTTPS / JSON
-       v
-Spring Boot application
-       |
-       | JPA + Flyway
-       v
-PostgreSQL
-```
+## Backend Structure
 
-The code is a layered modular monolith. Backend packages separate controllers, services, repositories, models, DTOs, and security mechanics without adding deployment and consistency costs before the alpha needs them. See [CODE_ARCHITECTURE.md](CODE_ARCHITECTURE.md) for the package map and request flows.
+The backend is a layered modular monolith:
 
-## Authentication and authorization
+- `controller` exposes HTTP endpoints for auth and workspace checks.
+- `service` handles login, JWT creation, and database-backed user loading.
+- `repository` owns JPA access to `app_users`.
+- `model` contains `User` and `Role`.
+- `dto` contains request/response records.
+- `security` contains the authenticated principal and JWT filter.
+- `config` wires Spring Security, CORS, password hashing, CSRF, JWT filter registration, and demo seeding.
+- `common` contains JSON error shapes and exception/security error writers.
 
-1. The browser requests `GET /api/v1/auth/csrf`.
-2. The browser submits credentials to `POST /api/v1/auth/login` with the CSRF header.
-3. Spring Security authenticates the email/password against PostgreSQL using BCrypt.
-4. The API returns safe user data and sets a signed JWT in an `HttpOnly`, `SameSite=Lax` cookie.
-5. The frontend redirects using the returned database role.
-6. Every protected API request is authenticated again by the JWT filter and authorized by the backend route rules. The filter is registered only inside the Spring Security chain; its automatic servlet registration is disabled to prevent duplicate execution and cross-request security-context issues.
+Controllers call services; services use repositories; repositories work with models. Controllers should not query repositories directly.
 
-The frontend route guard improves user experience but is never the security boundary.
+## Frontend Structure
 
-## Why cookie JWT + CSRF
+- `App.tsx` defines routes: `/`, `/login`, `/translator`, `/chief-editor`, `/project-manager`, and `*`.
+- `auth/` owns in-memory session state and protected routing.
+- `lib/api.ts` is the HTTP boundary; it sends cookies and CSRF headers.
+- `lib/roles.ts` maps backend roles to labels and routes.
+- `pages/` contains the landing page, login page, starter workspace, and 404 page.
+- `styles.css` holds shared product styling; `landing.css` holds landing-page styling.
 
-The access token is not exposed to JavaScript or browser storage, reducing the impact of token theft through XSS. Because the browser sends cookies automatically, state-changing requests require a separate CSRF token. The API remains stateless, leaving a clean path to horizontal scaling.
+## Data And Auth Flow
 
-## Data decisions
+1. Browser requests `GET /api/v1/auth/csrf`.
+2. Login posts email/password to `POST /api/v1/auth/login` with the CSRF header.
+3. Spring Security authenticates against `app_users` using BCrypt.
+4. Backend returns safe user fields and sets a JWT in an `HttpOnly`, `SameSite=Lax` cookie.
+5. React stores only the safe user profile in memory and redirects by role.
+6. `JwtAuthenticationFilter` authenticates later requests from the cookie.
+7. `SecurityConfig` enforces role access to each workspace endpoint.
 
-- PostgreSQL is the production database.
-- Flyway owns schema evolution; Hibernate validates rather than creates tables.
-- `app_users` avoids the reserved SQL word `user` while representing the master ERD's User entity.
-- Role is stored as a constrained string matching the Java enum.
-- Demo accounts are seeded in application code so their BCrypt hashes are generated securely and the operation remains idempotent.
-- H2 in PostgreSQL compatibility mode is used only for fast automated integration tests. Browser verification also runs against real PostgreSQL.
-
-## Frontend decisions
-
-- React and TypeScript run as a separately deployable Vite application.
-- Auth state is held in memory and restored from `/auth/me`; no access token is stored in JavaScript.
-- Semantic CSS tokens implement a light slate palette with teal used only as a restrained brand accent.
-- Role-specific dashboard configuration shares one component while preserving separate protected routes.
-- The product UI shows only Sprint 1 behavior. Roadmap and test-status copy stays in documentation rather than appearing as product functionality.
-
-## Growth path
-
-- Add Sprint 2-5 entities and use cases as feature packages within the monolith.
-- Add Redis only for a demonstrated cache, rate-limit, or distributed-session need.
-- Add Kafka only when durable asynchronous domain events have real consumers.
-- Containerize backend and frontend, then add Kubernetes manifests after deployment topology is known.
-- Add CI gates for backend tests, frontend tests/lint/build, database migration verification, and browser smoke tests.
+There is no self-registration flow in the current application.

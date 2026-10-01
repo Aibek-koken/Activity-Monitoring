@@ -165,9 +165,15 @@ p { margin-top: 0; }
 .auth-header {
   position: relative;
   z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
   width: min(100%, 1160px);
   margin: 0 auto;
 }
+
+.auth-back-link { flex: 0 0 auto; }
 
 .auth-card {
   position: relative;

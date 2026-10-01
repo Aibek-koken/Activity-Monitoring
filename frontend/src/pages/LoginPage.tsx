@@ -1,11 +1,11 @@
 import { useRef, useState } from 'react'
 import type { FormEvent } from 'react'
-import { ArrowRight, Check, Eye, EyeOff } from 'lucide-react'
-import { Navigate, useLocation, useNavigate } from 'react-router-dom'
+import { ArrowLeft, ArrowRight, Check, Eye, EyeOff } from 'lucide-react'
+import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { BrandMark } from '../components/BrandMark'
 import { ApiError } from '../lib/api'
 import { roleLabels, rolePath } from '../lib/roles'
-import { validateEmail } from '../lib/validation'
+import { validateEmail, validateLoginPassword } from '../lib/validation'
 import type { Role } from '../types/auth'
 import { useAuth } from '../auth/AuthContext'
 
@@ -63,8 +63,8 @@ export function LoginPage() {
     const clientErrors: Record<string, string> = {}
     const emailError = validateEmail(email)
     if (emailError) clientErrors.email = emailError
-    if (!password) clientErrors.password = 'Enter your password.'
-    if (password.length > 72) clientErrors.password = 'Password must be 72 characters or less.'
+    const passwordError = validateLoginPassword(password)
+    if (passwordError) clientErrors.password = passwordError
     if (Object.keys(clientErrors).length > 0) {
       setFieldErrors(clientErrors)
       if (clientErrors.email) emailRef.current?.focus()
@@ -103,6 +103,10 @@ export function LoginPage() {
     <main className="auth-page">
       <header className="auth-header">
         <BrandMark />
+        <Link className="button button--secondary auth-back-link" to="/">
+          <ArrowLeft size={17} aria-hidden="true" />
+          Landing
+        </Link>
       </header>
 
       <section className="auth-card" aria-labelledby="login-title">

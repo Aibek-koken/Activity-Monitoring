@@ -17,7 +17,8 @@ public final class AuthDtos {
             @Size(max = 160, message = "Email must be 160 characters or less")
             String email,
             @NotBlank(message = "Password is required")
-            @Size(max = 72, message = "Password must be 72 characters or less")
+            @Size(min = 8, message = "Password must be at least 8 characters")
+            @Size(max = 72, message = "Password is too long")
             String password
     ) {
     }

@@ -74,6 +74,21 @@ class AuthControllerIntegrationTest {
     }
 
     @Test
+    void shortPasswordIsRejectedBeforeAuthentication() throws Exception {
+        Csrf csrf = csrf();
+
+        mockMvc.perform(post("/api/v1/auth/login")
+                        .cookie(csrf.cookie())
+                        .header(csrf.headerName(), csrf.token())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"email":"translator@easylang.local","password":"123"}
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.fieldErrors.password").value("Password must be at least 8 characters"));
+    }
+
+    @Test
     void unauthenticatedRequestCannotOpenWorkspace() throws Exception {
         mockMvc.perform(get("/api/v1/workspaces/translator"))
                 .andExpect(status().isUnauthorized());
