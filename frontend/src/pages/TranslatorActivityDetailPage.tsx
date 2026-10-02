@@ -1,21 +1,51 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
-import { AlertCircle, ArrowLeft, ClipboardList, RefreshCw, Save } from 'lucide-react'
+import { AlertCircle, ArrowLeft, ClipboardList, Pencil, Plus, RefreshCw, Save } from 'lucide-react'
 import { Link, useParams } from 'react-router-dom'
 import { WorkspaceLayout } from '../components/WorkspaceLayout'
 import { activityStatusLabels, formatDate, formatVolume, formatWorkHours, statusClassName, toNumberOrNull } from '../lib/activity-format'
 import { ApiError, translatorActivityApi } from '../lib/api'
 import { latestAllowedRecordDateString, todayLocalDateString } from '../lib/date'
-import { validateRecordDate, validateTranslatedVolume, validateWorkHours } from '../lib/validation'
-import type { ActivityDetail } from '../types/activity'
+import { validateRecordDate, validateTranslatedVolume, validateWorkTime } from '../lib/validation'
+import type { ActivityDetail, WorkRecord } from '../types/activity'
 
 interface RecordFieldErrors {
   recordDate?: string
   translatedVolume?: string
   workHours?: string
+  workMinutes?: string
 }
 
 function inputValue(value: number): string {
   return Number.isInteger(value) ? String(value) : value.toFixed(2)
+}
+
+function recordMatches(record: WorkRecord, recordId: number | null): boolean {
+  return recordId !== null && record.id === recordId
+}
+
+function workTimeParts(value: number | string | null | undefined): { hours: string; minutes: string } {
+  const decimalHours = toNumberOrNull(value)
+  if (decimalHours === null) {
+    return { hours: '', minutes: '' }
+  }
+
+  const totalMinutes = Math.round(decimalHours * 60)
+  return {
+    hours: String(Math.floor(totalMinutes / 60)),
+    minutes: String(totalMinutes % 60),
+  }
+}
+
+function workTimePayload(hoursValue: string, minutesValue: string): number | null {
+  const hoursTrimmed = hoursValue.trim()
+  const minutesTrimmed = minutesValue.trim()
+  if (!hoursTrimmed && !minutesTrimmed) {
+    return null
+  }
+
+  const hours = hoursTrimmed ? Number(hoursTrimmed) : 0
+  const minutes = minutesTrimmed ? Number(minutesTrimmed) : 0
+  return Number((hours + minutes / 60).toFixed(2))
 }
 
 export function TranslatorActivityDetailPage() {
@@ -26,10 +56,12 @@ export function TranslatorActivityDetailPage() {
   const [recordDate, setRecordDate] = useState('')
   const [translatedVolume, setTranslatedVolume] = useState('')
   const [workHours, setWorkHours] = useState('')
+  const [workMinutes, setWorkMinutes] = useState('')
   const [fieldErrors, setFieldErrors] = useState<RecordFieldErrors>({})
   const [formError, setFormError] = useState<string | null>(null)
   const [formSuccess, setFormSuccess] = useState<string | null>(null)
   const [isSaving, setIsSaving] = useState(false)
+  const [editingRecordId, setEditingRecordId] = useState<number | null>(null)
   const todayLocal = todayLocalDateString()
   const latestAllowedDate = latestAllowedRecordDateString()
   const workRecords = useMemo(() => activity?.workRecords ?? [], [activity?.workRecords])
@@ -37,6 +69,35 @@ export function TranslatorActivityDetailPage() {
     () => workRecords.find((record) => record.recordDate === todayLocal) ?? null,
     [workRecords, todayLocal],
   )
+  const editingRecord = useMemo(
+    () => workRecords.find((record) => recordMatches(record, editingRecordId)) ?? null,
+    [editingRecordId, workRecords],
+  )
+
+  const fillFormFromRecord = (record: WorkRecord, clearMessages = true) => {
+    setEditingRecordId(record.id)
+    setRecordDate(record.recordDate)
+    setTranslatedVolume(inputValue(toNumberOrNull(record.translatedVolume) ?? 0))
+    const recordWorkTime = workTimeParts(record.workHours)
+    setWorkHours(recordWorkTime.hours)
+    setWorkMinutes(recordWorkTime.minutes)
+    setFieldErrors({})
+    if (clearMessages) {
+      setFormError(null)
+      setFormSuccess(null)
+    }
+  }
+
+  const startNewRecord = () => {
+    setEditingRecordId(null)
+    setRecordDate(todayLocal)
+    setTranslatedVolume('')
+    setWorkHours('')
+    setWorkMinutes('')
+    setFieldErrors({})
+    setFormError(null)
+    setFormSuccess(null)
+  }
 
   const loadActivity = useCallback(async () => {
     const parsedId = Number(activityId)
@@ -69,14 +130,13 @@ export function TranslatorActivityDetailPage() {
     if (!activity) return
 
     if (todayRecord) {
-      setRecordDate(todayRecord.recordDate)
-      setTranslatedVolume(inputValue(toNumberOrNull(todayRecord.translatedVolume) ?? 0))
-      const todayWorkHours = toNumberOrNull(todayRecord.workHours)
-      setWorkHours(todayWorkHours === null ? '' : inputValue(todayWorkHours))
+      fillFormFromRecord(todayRecord, false)
     } else {
+      setEditingRecordId(null)
       setRecordDate(todayLocal)
       setTranslatedVolume('')
       setWorkHours('')
+      setWorkMinutes('')
     }
     setFieldErrors({})
     setFormError(null)
@@ -96,13 +156,14 @@ export function TranslatorActivityDetailPage() {
     event.preventDefault()
     if (!activity) return
 
+    const workTimeErrors = validateWorkTime(workHours, workMinutes)
     const nextErrors: RecordFieldErrors = {
-      recordDate: todayRecord ? undefined : validateRecordDate(recordDate, latestAllowedDate) ?? undefined,
+      recordDate: editingRecord ? undefined : validateRecordDate(recordDate, latestAllowedDate) ?? undefined,
       translatedVolume: validateTranslatedVolume(translatedVolume) ?? undefined,
-      workHours: validateWorkHours(workHours) ?? undefined,
+      ...workTimeErrors,
     }
 
-    if (nextErrors.recordDate || nextErrors.translatedVolume || nextErrors.workHours) {
+    if (nextErrors.recordDate || nextErrors.translatedVolume || nextErrors.workHours || nextErrors.workMinutes) {
       setFieldErrors(nextErrors)
       setFormError(null)
       setFormSuccess(null)
@@ -111,7 +172,7 @@ export function TranslatorActivityDetailPage() {
 
     const payload = {
       translatedVolume: Number(translatedVolume.trim()),
-      workHours: workHours.trim() ? Number(workHours.trim()) : null,
+      workHours: workTimePayload(workHours, workMinutes),
     }
 
     setIsSaving(true)
@@ -120,18 +181,21 @@ export function TranslatorActivityDetailPage() {
     setFormSuccess(null)
 
     try {
-      const updatedActivity = todayRecord
-        ? await translatorActivityApi.updateWorkRecord(activity.id, todayRecord.id, payload)
+      const existingRecordForDate = workRecords.find((record) => record.recordDate === recordDate) ?? null
+      const recordToUpdate = editingRecord ?? existingRecordForDate
+      const updatedActivity = recordToUpdate
+        ? await translatorActivityApi.updateWorkRecord(activity.id, recordToUpdate.id, payload)
         : await translatorActivityApi.createWorkRecord(activity.id, { recordDate, ...payload })
       setActivity(updatedActivity)
-      setFormSuccess(todayRecord ? 'Daily record updated.' : 'Daily record saved.')
+      setEditingRecordId(recordToUpdate?.id ?? null)
+      setFormSuccess(recordToUpdate ? 'Daily record updated.' : 'Daily record saved.')
     } catch (saveError) {
       if (saveError instanceof ApiError) {
         setFieldErrors(saveError.fieldErrors)
         setFormError(saveError.message)
-        if (saveError.status === 409 && recordDate === todayLocal) {
+        if (saveError.status === 409) {
           await loadActivity()
-          setFormError('A record for today already exists. Review it and save changes.')
+          setFormError('A record for this date already exists. Select it in the history and save changes.')
         }
       } else {
         setFormError('Daily record could not be saved. Try again.')
@@ -216,14 +280,26 @@ export function TranslatorActivityDetailPage() {
 
             <section className="work-record-panel" aria-labelledby="record-form-title">
               <div className="section-heading">
-                <h2 id="record-form-title">{todayRecord ? "Edit today's record" : 'Record today'}</h2>
-                <p>{todayRecord ? `Saved for ${formatDate(todayRecord.recordDate)}` : 'Past dates are allowed. Future dates are not.'}</p>
+                <div>
+                  <h2 id="record-form-title">{editingRecord ? 'Edit daily record' : 'Record translated volume'}</h2>
+                  <p>
+                    {editingRecord
+                      ? `You are editing ${formatDate(editingRecord.recordDate)}. The date stays locked; change the volume or hours only.`
+                      : 'Choose today or a past date. Future dates are blocked.'}
+                  </p>
+                </div>
+                {editingRecord && (
+                  <button className="button button--secondary" disabled={isSaving} type="button" onClick={startNewRecord}>
+                    <Plus size={17} aria-hidden="true" />
+                    New date
+                  </button>
+                )}
               </div>
 
               <form className="work-record-form" noValidate onSubmit={(event) => void handleRecordSubmit(event)}>
                 <div className="field-group">
                   <label htmlFor="record-date">Record date</label>
-                  {todayRecord ? (
+                  {editingRecord ? (
                     <input
                       className="readonly-field"
                       id="record-date"
@@ -239,13 +315,23 @@ export function TranslatorActivityDetailPage() {
                       id="record-date"
                       max={latestAllowedDate}
                       onChange={(event) => {
-                        setRecordDate(event.target.value)
-                        clearFieldError('recordDate')
+                        const nextDate = event.target.value
+                        const existingRecord = workRecords.find((record) => record.recordDate === nextDate)
+                        if (existingRecord) {
+                          fillFormFromRecord(existingRecord)
+                        } else {
+                          setRecordDate(nextDate)
+                          setEditingRecordId(null)
+                          clearFieldError('recordDate')
+                        }
                       }}
                       type="date"
                       value={recordDate}
                     />
                   )}
+                  <p className="field-hint">
+                    {editingRecord ? 'Locked while editing so history keeps one row per date.' : `Latest allowed date: ${formatDate(latestAllowedDate)}.`}
+                  </p>
                   {fieldErrors.recordDate && <p className="field-error" id="record-date-error">{fieldErrors.recordDate}</p>}
                 </div>
 
@@ -265,33 +351,55 @@ export function TranslatorActivityDetailPage() {
                     type="text"
                     value={translatedVolume}
                   />
+                  <p className="field-hint">Required. Use 0.01 to 1000.00, up to 2 decimals.</p>
                   {fieldErrors.translatedVolume && (
                     <p className="field-error" id="translated-volume-error">{fieldErrors.translatedVolume}</p>
                   )}
                 </div>
 
                 <div className="field-group">
-                  <label htmlFor="work-hours">Work hours (optional)</label>
+                  <label htmlFor="work-hours">Hours (optional)</label>
                   <input
                     aria-describedby={fieldErrors.workHours ? 'work-hours-error' : undefined}
                     aria-invalid={fieldErrors.workHours ? 'true' : 'false'}
                     disabled={isSaving}
                     id="work-hours"
-                    inputMode="decimal"
+                    inputMode="numeric"
                     onChange={(event) => {
                       setWorkHours(event.target.value)
                       clearFieldError('workHours')
                     }}
-                    placeholder="0.00"
+                    placeholder="0"
                     type="text"
                     value={workHours}
                   />
+                  <p className="field-hint">Whole hours, 0 to 24.</p>
                   {fieldErrors.workHours && <p className="field-error" id="work-hours-error">{fieldErrors.workHours}</p>}
+                </div>
+
+                <div className="field-group">
+                  <label htmlFor="work-minutes">Minutes</label>
+                  <input
+                    aria-describedby={fieldErrors.workMinutes ? 'work-minutes-error' : undefined}
+                    aria-invalid={fieldErrors.workMinutes ? 'true' : 'false'}
+                    disabled={isSaving}
+                    id="work-minutes"
+                    inputMode="numeric"
+                    onChange={(event) => {
+                      setWorkMinutes(event.target.value)
+                      clearFieldError('workMinutes')
+                    }}
+                    placeholder="0"
+                    type="text"
+                    value={workMinutes}
+                  />
+                  <p className="field-hint">0 to 59. Leave both time fields blank if unknown.</p>
+                  {fieldErrors.workMinutes && <p className="field-error" id="work-minutes-error">{fieldErrors.workMinutes}</p>}
                 </div>
 
                 <button aria-busy={isSaving} className="button button--primary" disabled={isSaving} type="submit">
                   <Save size={17} aria-hidden="true" />
-                  {isSaving ? 'Saving…' : todayRecord ? 'Update record' : 'Save record'}
+                  {isSaving ? 'Saving…' : editingRecord ? 'Update record' : 'Save record'}
                 </button>
               </form>
 
@@ -318,14 +426,28 @@ export function TranslatorActivityDetailPage() {
                         <th scope="col">Date</th>
                         <th scope="col">Translated volume</th>
                         <th scope="col">Work hours</th>
+                        <th scope="col">
+                          <span className="sr-only">Actions</span>
+                        </th>
                       </tr>
                     </thead>
                     <tbody>
                       {workRecords.map((record) => (
-                        <tr key={record.id}>
+                        <tr className={recordMatches(record, editingRecordId) ? 'record-table__row--selected' : undefined} key={record.id}>
                           <td>{formatDate(record.recordDate)}</td>
                           <td>{formatVolume(record.translatedVolume)}</td>
                           <td>{formatWorkHours(record.workHours)}</td>
+                          <td>
+                            <button
+                              className="button button--ghost button--compact"
+                              disabled={isSaving}
+                              type="button"
+                              onClick={() => fillFormFromRecord(record)}
+                            >
+                              <Pencil size={16} aria-hidden="true" />
+                              Edit
+                            </button>
+                          </td>
                         </tr>
                       ))}
                     </tbody>

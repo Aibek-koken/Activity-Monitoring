@@ -27,10 +27,10 @@ export function toNumberOrNull(value: number | string | null | undefined): numbe
 
 export function formatVolume(value: number | string | null | undefined): string {
   const amount = toNumberOrNull(value) ?? 0
-  return `${new Intl.NumberFormat(UI_LOCALE, {
+  return new Intl.NumberFormat(UI_LOCALE, {
     maximumFractionDigits: 2,
     minimumFractionDigits: amount % 1 === 0 ? 0 : 2,
-  }).format(amount)} volume units`
+  }).format(amount)
 }
 
 export function formatDate(value: string | null | undefined): string {
@@ -47,7 +47,16 @@ export function formatDate(value: string | null | undefined): string {
 
 export function formatWorkHours(value: number | string | null | undefined): string {
   const hours = toNumberOrNull(value)
-  return hours === null ? 'Not entered' : hours.toFixed(2)
+  if (hours === null) return 'Not entered'
+
+  const totalMinutes = Math.round(hours * 60)
+  const wholeHours = Math.floor(totalMinutes / 60)
+  const minutes = totalMinutes % 60
+
+  if (wholeHours === 0 && minutes === 0) return '0 h'
+  if (minutes === 0) return `${wholeHours} h`
+  if (wholeHours === 0) return `${minutes} min`
+  return `${wholeHours} h ${minutes} min`
 }
 
 export function statusClassName(status: ActivityStatus): string {

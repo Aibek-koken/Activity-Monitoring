@@ -82,7 +82,7 @@ describe('TranslatorActivitiesPage', () => {
 
     expect(screen.getByText('Privacy policy translation')).toBeInTheDocument()
     expect(screen.getByText('EL-2026-001')).toBeInTheDocument()
-    expect(screen.getAllByText('20.75 volume units')).toHaveLength(2)
+    expect(screen.getAllByText('20.75')).toHaveLength(2)
   })
 
   it('shows an empty state when no activities are assigned', async () => {

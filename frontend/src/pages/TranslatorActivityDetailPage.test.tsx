@@ -162,8 +162,8 @@ describe('TranslatorActivityDetailPage', () => {
 
     expect(await screen.findByRole('heading', { name: 'Privacy policy translation' })).toBeInTheDocument()
     expect(screen.getByText('EL-2026-001')).toBeInTheDocument()
-    expect(screen.getAllByText('8.25 volume units')).toHaveLength(2)
-    expect(screen.getByText('2.50')).toBeInTheDocument()
+    expect(screen.getAllByText('8.25')).toHaveLength(2)
+    expect(screen.getByText('2 h 30 min')).toBeInTheDocument()
   })
 
   it('renders records whose work hours are absent, null or set', async () => {
@@ -174,7 +174,7 @@ describe('TranslatorActivityDetailPage', () => {
     expect(await screen.findByRole('heading', { name: 'Onboarding email sequence' })).toBeInTheDocument()
     expect(screen.getByRole('row', { name: /Sep 30, 2026/ })).toHaveTextContent('Not entered')
     expect(screen.getByRole('row', { name: /Sep 29, 2026/ })).toHaveTextContent('Not entered')
-    expect(screen.getByRole('row', { name: /Sep 28, 2026/ })).toHaveTextContent('3.00')
+    expect(screen.getByRole('row', { name: /Sep 28, 2026/ })).toHaveTextContent('3 h')
   })
 
   it('prefills the form with a numeric work hours value from an existing record', async () => {
@@ -188,7 +188,7 @@ describe('TranslatorActivityDetailPage', () => {
 
     renderPage()
 
-    await screen.findByRole('heading', { name: "Edit today's record" })
+    await screen.findByRole('heading', { name: 'Edit daily record' })
     await user.click(screen.getByRole('button', { name: 'Update record' }))
 
     expect(translatorActivityApi.updateWorkRecord).toHaveBeenCalledWith(101, 601, {
@@ -209,7 +209,7 @@ describe('TranslatorActivityDetailPage', () => {
 
     renderPage()
 
-    await screen.findByRole('heading', { name: "Edit today's record" })
+    await screen.findByRole('heading', { name: 'Edit daily record' })
     await user.click(screen.getByRole('button', { name: 'Update record' }))
 
     expect(translatorActivityApi.updateWorkRecord).toHaveBeenCalledWith(101, 602, {
@@ -225,7 +225,7 @@ describe('TranslatorActivityDetailPage', () => {
 
     expect(await screen.findByRole('heading', { name: 'No daily records yet' })).toBeInTheDocument()
     expect(screen.getAllByText('No records yet').length).toBeGreaterThan(0)
-    expect(screen.getByRole('heading', { name: 'Record today' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Record translated volume' })).toBeInTheDocument()
   })
 
   it('shows inline validation before saving a daily record', async () => {
@@ -233,10 +233,26 @@ describe('TranslatorActivityDetailPage', () => {
 
     renderPage()
 
-    await screen.findByRole('heading', { name: 'Record today' })
+    await screen.findByRole('heading', { name: 'Record translated volume' })
     fireEvent.click(screen.getByRole('button', { name: 'Save record' }))
 
     expect(screen.getByText('Enter translated volume.')).toBeInTheDocument()
+    expect(translatorActivityApi.createWorkRecord).not.toHaveBeenCalled()
+  })
+
+  it('rejects minutes greater than 59 before saving work time', async () => {
+    const user = userEvent.setup()
+    vi.mocked(translatorActivityApi.get).mockResolvedValue(baseActivity)
+
+    renderPage()
+
+    await screen.findByRole('heading', { name: 'Record translated volume' })
+    await user.type(screen.getByLabelText('Translated volume (units)'), '4.5')
+    await user.type(screen.getByLabelText('Hours (optional)'), '3')
+    await user.type(screen.getByLabelText('Minutes'), '90')
+    await user.click(screen.getByRole('button', { name: 'Save record' }))
+
+    expect(screen.getByText('Minutes must be 0 to 59.')).toBeInTheDocument()
     expect(translatorActivityApi.createWorkRecord).not.toHaveBeenCalled()
   })
 
@@ -263,7 +279,7 @@ describe('TranslatorActivityDetailPage', () => {
 
     renderPage()
 
-    await screen.findByRole('heading', { name: 'Record today' })
+    await screen.findByRole('heading', { name: 'Record translated volume' })
     await user.type(screen.getByLabelText('Translated volume (units)'), '4.5')
     await user.click(screen.getByRole('button', { name: 'Save record' }))
 
@@ -273,6 +289,41 @@ describe('TranslatorActivityDetailPage', () => {
       translatedVolume: 4.5,
       workHours: null,
     })
-    expect(screen.getByRole('heading', { name: "Edit today's record" })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Edit daily record' })).toBeInTheDocument()
+  })
+
+  it('can select an older record from history for editing without changing its date', async () => {
+    const user = userEvent.setup()
+    vi.mocked(translatorActivityApi.get).mockResolvedValue({
+      ...baseActivity,
+      progress: {
+        lastRecordDate: '2026-09-30',
+        recordCount: 2,
+        totalTranslatedVolume: 14,
+      },
+      workRecords: [
+        { id: 701, recordDate: '2026-09-30', translatedVolume: 8.25, workHours: 2.5 },
+        { id: 700, recordDate: '2026-09-29', translatedVolume: 5.75, workHours: null },
+      ],
+    })
+    vi.mocked(translatorActivityApi.updateWorkRecord).mockResolvedValue(baseActivity)
+
+    renderPage()
+
+    await screen.findByRole('heading', { name: 'Record translated volume' })
+    await user.click(screen.getAllByRole('button', { name: 'Edit' })[1])
+
+    expect(screen.getByRole('heading', { name: 'Edit daily record' })).toBeInTheDocument()
+    expect(screen.getByLabelText('Record date')).toHaveValue('Sep 29, 2026')
+    expect(screen.getByLabelText('Translated volume (units)')).toHaveValue('5.75')
+
+    await user.clear(screen.getByLabelText('Translated volume (units)'))
+    await user.type(screen.getByLabelText('Translated volume (units)'), '6.25')
+    await user.click(screen.getByRole('button', { name: 'Update record' }))
+
+    expect(translatorActivityApi.updateWorkRecord).toHaveBeenCalledWith(101, 700, {
+      translatedVolume: 6.25,
+      workHours: null,
+    })
   })
 })

@@ -21,21 +21,21 @@ describe('toNumberOrNull', () => {
 
 describe('formatVolume', () => {
   it('drops trailing zeros for whole numbers', () => {
-    expect(formatVolume(20)).toBe('20 volume units')
+    expect(formatVolume(20)).toBe('20')
   })
 
   it('keeps two decimals for fractional volumes', () => {
-    expect(formatVolume(8.25)).toBe('8.25 volume units')
-    expect(formatVolume(12.5)).toBe('12.50 volume units')
+    expect(formatVolume(8.25)).toBe('8.25')
+    expect(formatVolume(12.5)).toBe('12.50')
   })
 
   it('groups thousands with the en-US locale regardless of browser locale', () => {
-    expect(formatVolume(1234.5)).toBe('1,234.50 volume units')
+    expect(formatVolume(1234.5)).toBe('1,234.50')
   })
 
   it('falls back to zero for absent values', () => {
-    expect(formatVolume(undefined)).toBe('0 volume units')
-    expect(formatVolume(null)).toBe('0 volume units')
+    expect(formatVolume(undefined)).toBe('0')
+    expect(formatVolume(null)).toBe('0')
   })
 })
 
@@ -45,10 +45,12 @@ describe('formatWorkHours', () => {
     expect(formatWorkHours(null)).toBe('Not entered')
   })
 
-  it('renders two decimals otherwise', () => {
-    expect(formatWorkHours(3)).toBe('3.00')
-    expect(formatWorkHours(2.5)).toBe('2.50')
-    expect(formatWorkHours('4')).toBe('4.00')
+  it('renders decimal hours as hours and minutes', () => {
+    expect(formatWorkHours(3)).toBe('3 h')
+    expect(formatWorkHours(2.5)).toBe('2 h 30 min')
+    expect(formatWorkHours('4')).toBe('4 h')
+    expect(formatWorkHours(0.25)).toBe('15 min')
+    expect(formatWorkHours(0)).toBe('0 h')
   })
 })
 

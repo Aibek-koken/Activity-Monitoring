@@ -1,5 +1,6 @@
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const DECIMAL_PATTERN = /^\d+(\.\d{1,2})?$/
+const INTEGER_PATTERN = /^\d+$/
 
 export function validateEmail(value: string): string | null {
   const email = value.trim()
@@ -33,13 +34,41 @@ export function validateTranslatedVolume(value: string): string | null {
   return null
 }
 
-export function validateWorkHours(value: string): string | null {
-  const trimmed = value.trim()
-  if (!trimmed) return null
-  if (!DECIMAL_PATTERN.test(trimmed)) return 'Use hours with up to 2 decimal places.'
+export function validateWorkTime(hoursValue: string, minutesValue: string): { workHours?: string; workMinutes?: string } {
+  const hoursTrimmed = hoursValue.trim()
+  const minutesTrimmed = minutesValue.trim()
+  const errors: { workHours?: string; workMinutes?: string } = {}
 
-  const amount = Number(trimmed)
-  if (amount < 0) return 'Work hours cannot be negative.'
-  if (amount > 24) return 'Work hours must be 24.00 or less.'
-  return null
+  if (!hoursTrimmed && !minutesTrimmed) {
+    return errors
+  }
+
+  if (hoursTrimmed && !INTEGER_PATTERN.test(hoursTrimmed)) {
+    errors.workHours = 'Use whole hours.'
+  }
+
+  if (minutesTrimmed && !INTEGER_PATTERN.test(minutesTrimmed)) {
+    errors.workMinutes = 'Use whole minutes.'
+  }
+
+  if (errors.workHours || errors.workMinutes) {
+    return errors
+  }
+
+  const hours = hoursTrimmed ? Number(hoursTrimmed) : 0
+  const minutes = minutesTrimmed ? Number(minutesTrimmed) : 0
+
+  if (hours > 24) {
+    errors.workHours = 'Work time must be 24 hours or less.'
+  }
+
+  if (minutes > 59) {
+    errors.workMinutes = 'Minutes must be 0 to 59.'
+  }
+
+  if (hours === 24 && minutes > 0) {
+    errors.workMinutes = '24 hours is the maximum, so minutes must be 0.'
+  }
+
+  return errors
 }
