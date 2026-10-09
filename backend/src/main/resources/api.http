@@ -1,5 +1,161 @@
-### GET request to example server
-GET https://examples.http-client.intellij.net/get
-    ?generated-in=IntelliJ IDEA
+@baseUrl = http://localhost:8080/api
+@activityId = 1
+@recordId = 1
 
-###
+### 1. Health check
+GET http://localhost:8080/actuator/health
+
+
+### 2. Получить CSRF token
+GET {{baseUrl}}/v1/auth/csrf
+
+
+### 3. Login as translator
+POST {{baseUrl}}/v1/auth/login
+Content-Type: application/json
+X-XSRF-TOKEN: e1dc9929-bc0c-425a-b5c0-a3015b465e17
+
+{
+  "email": "translator@easylang.local",
+  "password": "Demo123!"
+}
+
+
+### 4. Current user
+GET {{baseUrl}}/v1/auth/me
+
+
+### 5. Translator workspace
+GET {{baseUrl}}/v1/workspaces/translator
+
+
+### 6. GET all assigned activities
+GET {{baseUrl}}/v1/translator/activities
+
+
+### 7. Search by activity number
+GET {{baseUrl}}/v1/translator/activities?q=EL-2026-001
+
+
+### 8. Search by activity name
+GET {{baseUrl}}/v1/translator/activities?q=privacy
+
+
+### 9. Search no results
+GET {{baseUrl}}/v1/translator/activities?q=zzzzzz-not-found
+
+
+### 10. GET activity detail
+GET {{baseUrl}}/v1/translator/activities/{{activityId}}
+
+
+### 11. Get CSRF before POST
+GET {{baseUrl}}/v1/auth/csrf
+
+
+### 12. POST create work record
+POST {{baseUrl}}/v1/translator/activities/{{activityId}}/work-records
+Content-Type: application/json
+X-XSRF-TOKEN: ВСТАВЬ_CSRF_TOKEN_ИЗ_ПРЕДЫДУЩЕГО_ОТВЕТА
+
+{
+  "recordDate": "2026-10-09",
+  "translatedVolume": 15.25,
+  "workHours": 2.50
+}
+
+
+### 13. POST duplicate date should fail with 409
+POST {{baseUrl}}/v1/translator/activities/{{activityId}}/work-records
+Content-Type: application/json
+X-XSRF-TOKEN: ВСТАВЬ_CSRF_TOKEN_ИЗ_ПРЕДЫДУЩЕГО_ОТВЕТА
+
+{
+  "recordDate": "2026-10-09",
+  "translatedVolume": 11.00,
+  "workHours": 1.00
+}
+
+
+### 14. POST invalid volume should fail
+POST {{baseUrl}}/v1/translator/activities/{{activityId}}/work-records
+Content-Type: application/json
+X-XSRF-TOKEN: ВСТАВЬ_CSRF_TOKEN_ИЗ_ПРЕДЫДУЩЕГО_ОТВЕТА
+
+{
+  "recordDate": "2026-10-08",
+  "translatedVolume": 0,
+  "workHours": 1.00
+}
+
+
+### 15. POST future date should fail
+POST {{baseUrl}}/v1/translator/activities/{{activityId}}/work-records
+Content-Type: application/json
+X-XSRF-TOKEN: ВСТАВЬ_CSRF_TOKEN_ИЗ_ПРЕДЫДУЩЕГО_ОТВЕТА
+
+{
+  "recordDate": "2030-01-01",
+  "translatedVolume": 10.00,
+  "workHours": 1.00
+}
+
+
+### 16. Get detail again and copy workRecords[0].id into @recordId
+GET {{baseUrl}}/v1/translator/activities/{{activityId}}
+
+
+### 17. Get CSRF before PUT
+GET {{baseUrl}}/v1/auth/csrf
+
+
+### 18. PUT edit work record
+PUT {{baseUrl}}/v1/translator/activities/{{activityId}}/work-records/{{recordId}}
+Content-Type: application/json
+X-XSRF-TOKEN: e1dc9929-bc0c-425a-b5c0-a3015b465e17
+
+{
+  "translatedVolume": 20.75,
+  "workHours": 3.25
+}
+
+
+### 19. PUT invalid work hours should fail
+PUT {{baseUrl}}/v1/translator/activities/{{activityId}}/work-records/{{recordId}}
+Content-Type: application/json
+X-XSRF-TOKEN: ВСТАВЬ_CSRF_TOKEN_ИЗ_ПРЕДЫДУЩЕГО_ОТВЕТА
+
+{
+  "translatedVolume": 20.75,
+  "workHours": 25.00
+}
+
+
+### 20. POST without CSRF should fail
+POST {{baseUrl}}/v1/translator/activities/{{activityId}}/work-records
+Content-Type: application/json
+
+{
+  "recordDate": "2026-10-07",
+  "translatedVolume": 10.00,
+  "workHours": 1.00
+}
+
+
+### 21. Login as manager
+GET {{baseUrl}}/v1/auth/csrf
+
+
+### 22. Manager login
+POST {{baseUrl}}/v1/auth/login
+Content-Type: application/json
+X-XSRF-TOKEN:
+
+{
+  "email": "manager@easylang.local",
+  "password": "Demo123!"
+}
+
+
+### 23. Manager tries translator API: should fail
+GET {{baseUrl}}/v1/translator/activities
