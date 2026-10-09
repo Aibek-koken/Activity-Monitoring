@@ -329,9 +329,6 @@ export function TranslatorActivityDetailPage() {
                       value={recordDate}
                     />
                   )}
-                  <p className="field-hint">
-                    {editingRecord ? 'Locked while editing so history keeps one row per date.' : `Latest allowed date: ${formatDate(latestAllowedDate)}.`}
-                  </p>
                   {fieldErrors.recordDate && <p className="field-error" id="record-date-error">{fieldErrors.recordDate}</p>}
                 </div>
 
@@ -351,7 +348,6 @@ export function TranslatorActivityDetailPage() {
                     type="text"
                     value={translatedVolume}
                   />
-                  <p className="field-hint">Required. Use 0.01 to 1000.00, up to 2 decimals.</p>
                   {fieldErrors.translatedVolume && (
                     <p className="field-error" id="translated-volume-error">{fieldErrors.translatedVolume}</p>
                   )}
@@ -373,7 +369,6 @@ export function TranslatorActivityDetailPage() {
                     type="text"
                     value={workHours}
                   />
-                  <p className="field-hint">Whole hours, 0 to 24.</p>
                   {fieldErrors.workHours && <p className="field-error" id="work-hours-error">{fieldErrors.workHours}</p>}
                 </div>
 
@@ -393,7 +388,6 @@ export function TranslatorActivityDetailPage() {
                     type="text"
                     value={workMinutes}
                   />
-                  <p className="field-hint">0 to 59. Leave both time fields blank if unknown.</p>
                   {fieldErrors.workMinutes && <p className="field-error" id="work-minutes-error">{fieldErrors.workMinutes}</p>}
                 </div>
 
