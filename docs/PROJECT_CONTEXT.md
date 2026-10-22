@@ -1,6 +1,6 @@
 # Project Context
 
-Last updated: 2026-09-21
+Last updated: 2026-10-22
 
 ## Product
 
@@ -38,17 +38,19 @@ The master ERD remains the target model. Sprint 1 intentionally implements only 
 
 ## Current implementation
 
-The first sprint lives in a monorepo with separately runnable backend and frontend applications. Authentication uses database users, BCrypt password hashes, stateless JWTs in `HttpOnly` cookies, CSRF tokens for state-changing browser requests, and server-side role checks. The frontend adds route guards and redirects each role to a dedicated starter workspace.
+Sprints 1 and 2 are complete locally. Authentication uses database users, BCrypt password hashes, stateless JWTs in `HttpOnly` cookies, CSRF tokens for state-changing browser requests, and server-side role checks. Translators can view/search their own assignments and create/edit daily translated-volume records. The activity list also has client-side role/status/assigned-date filters; detail pages have a collapsed record history with date filtering. Projects and assignments are demo-seeded until the manager workflow is built.
 
-See `SPRINT_1_STATUS.md` for exact acceptance status and `ARCHITECTURE.md` for decisions that future work should preserve.
+See `SPRINT_1_STATUS.md` and `SPRINT_2_STATUS.md` for delivered scope, `ARCHITECTURE.md` for the current system map, and `SPRINT_3_PLAN.md` for the next implementation slice.
 
 ## Planned sequence
 
-1. Sprint 2 — Project/Activity foundation, Translator activity list/details, daily work records.
-2. Sprint 3 — weekly remaining-text estimates, completion rule, reminders.
+1. Sprint 2 — complete locally: Project/Activity foundation, Translator activity list/details, daily work records.
+2. Sprint 3 — next: weekly remaining-text estimates, `FINISHED` when the responsible translator reports zero remaining, daily/weekly reminders.
 3. Sprint 4 — Chief Editor review and correction cycle.
 4. Sprint 5 — Project Manager staffing, monitoring, estimated-total trend, risk flags.
 5. Sprint 6 — integrated workflow, alpha testing, demonstration.
 
 Redis, Kafka, Kubernetes, and CI/CD may be introduced when a concrete requirement needs them. The current boundaries and environment-based configuration are designed to support that evolution without prematurely distributing the system.
+
+The original six-sprint overview and master user-story file named above are not currently available in this workspace; the Sprint 3 working plan is cross-checked against the available Task 3 PDF, software design, and database design. Exact reminder timing, channel, and estimate ownership need an implementation decision.
 

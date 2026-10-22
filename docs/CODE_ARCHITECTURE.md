@@ -2,6 +2,8 @@
 
 Last updated: 2026-09-22
 
+This is a historical deep dive into the Sprint 1 authentication slice. For the current Sprint 2 translator domain and Sprint 3 extension point, use `ARCHITECTURE.md`, `API.md`, and `SPRINT_3_PLAN.md`.
+
 This document explains how the EasyLang Sprint 1 implementation is organized, how login and role-based access work, and where new code should be added. The repository contains a React client and a Spring Boot API that run as separate applications and share PostgreSQL through HTTP APIs.
 
 ## 1. System overview

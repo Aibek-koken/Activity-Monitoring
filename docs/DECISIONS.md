@@ -1,6 +1,6 @@
 # Decisions
 
-Last updated: 2026-10-01
+Last updated: 2026-10-22
 
 | Date | Decision | Reason |
 | --- | --- | --- |
@@ -18,3 +18,5 @@ Last updated: 2026-10-01
 | 2026-10-01 | Default the daily record form to the browser's local date, but reject only dates later than UTC+14 on the backend. | Translators get the expected local default while the API accepts "today" across all global time zones and still blocks true future entries. |
 | 2026-10-01 | Search translator activities server-side by case-insensitive partial activity number or name. | Search results must respect server-side translator ownership, not only client-side filtering. |
 | 2026-10-01 | Treat applied Flyway migrations as immutable; keep restored V2 content and move the translated-volume column rename into V3. | V2 may already exist in local or teammate databases, so changing its checksum would make upgrades fragile. |
+| 2026-10-22 | Limit a translator to 5 active responsible assignments and 10 active assisting assignments, counted separately; only `COMPLETED` frees a place. Enforce this when Project Manager assignment is built. | The current Sprint 2 data is demo-seeded and has no assignment API or manager UI. The future service must check the relevant quota atomically with assignment creation and return a clear conflict; the manager UI should show each quota and explain when it is full. Chief Editors do not assign translators. |
+| 2026-10-22 | Close Sprint 2 locally and make translator weekly estimates, zero-remaining `FINISHED`, and daily/weekly reminders the Sprint 3 working scope. | The available project context and software/database design place these translator flows after daily records and before editor checking. The source six-sprint overview is unavailable in this workspace, so exact reminder and estimate policies remain explicit open decisions in `SPRINT_3_PLAN.md`. |

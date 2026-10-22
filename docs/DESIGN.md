@@ -1,6 +1,6 @@
 # Design
 
-Last updated: 2026-10-01
+Last updated: 2026-10-22
 
 ## Tokens
 
@@ -23,6 +23,8 @@ Landing-only tokens live in `frontend/src/landing.css`: dark slate hero (`--land
 - `LoginPage` uses an auth card, field groups, password visibility button, alert, primary submit, back-to-landing button, and quick-access role buttons.
 - `LandingPage` uses a full-viewport dark hero, monitoring preview, capability blocks, activity flow, role cards, final CTA, and footer.
 - `WorkspacePage` uses a protected starter workspace shell with role-specific labels and logout.
+- `TranslatorActivitiesPage` uses a breadcrumb, a restrained page title, search, and a compact All / Responsible / Assisting assignment filter. A filter button opens status and assigned-date controls; there is no top summary-card row.
+- `TranslatorActivityDetailPage` uses a breadcrumb and keeps daily history collapsed until requested. Its history toolbar filters records by an inclusive date range, independently of the entry form and lifetime progress.
 - `FullPageStatus` and `NotFoundPage` provide status/error states.
 
 ## UX Rules Already Used
@@ -35,3 +37,11 @@ Landing-only tokens live in `frontend/src/landing.css`: dark slate hero (`--land
 - Keep focus styles visible with a 3px focus outline.
 - Support responsive layouts around mobile, tablet, and desktop widths.
 - Respect `prefers-reduced-motion` for non-essential landing animations.
+- Preserve list search, assignment role, status, and assigned-date filters in the URL when opening an activity and returning through the breadcrumb.
+- Align daily-record form inputs on the same row even when the optional-hours label wraps; use fewer columns before the form becomes too narrow.
+- Use two native date inputs for exact history ranges; empty bounds are open-ended, an inverted range shows an error, and clearing dates restores all records.
+- On narrow screens, show history records as compact stacked rows so the date, volume, work time, and edit action remain visible without horizontal page scrolling.
+
+## Sprint 3 UI Direction
+
+Weekly remaining estimates should live on the existing translator activity detail page, with the current value and dated history easy to distinguish from cumulative translated volume. Show a finish action only for an eligible responsible translator and explain that `FINISHED` awaits Chief Editor checking. Reminders should be compact, actionable links to the relevant activity; the delivery channel and schedule are still to be settled in `SPRINT_3_PLAN.md`. Reuse the current tokens, form/error conventions, and responsive behavior.

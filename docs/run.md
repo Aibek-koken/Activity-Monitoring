@@ -1,16 +1,6 @@
-quick start
-
-docker compose up -d --wait
-cd backend && mvn spring-boot:run
-
-cd frontend && npm run dev
-
-
-
-
-
 # Run EasyLang locally
 
+Sprint 1 and Sprint 2 are complete locally. Sprint 3 is next; see `SPRINT_3_PLAN.md` for planned functionality. The commands below run the current Sprint 2 application.
 
 ## 1. PostgreSQL
 
@@ -40,35 +30,7 @@ npm run dev
 
 Open `http://localhost:5173`.
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-БД:
-
-```bash
-docker compose up -d --wait
-cd backend && mvn spring-boot:run
-cd frontend && npm run dev
-```
+## Database inspection
 
 Postgres:
 

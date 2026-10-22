@@ -10,6 +10,8 @@
 
 **Full-stack activity tracking system with secure authentication, role-based workspaces, and translator progress records.**
 
+**Project status:** Sprint 1 and Sprint 2 are complete locally. Sprint 3 is next and has not been implemented. Its scope is weekly remaining-text estimates, a `FINISHED` transition when the responsible translator reports zero remaining, and daily/weekly reminders.
+
 The repository contains an independent Spring Boot API and React/TypeScript frontend. The strongest part of the project is the security and access model: authentication is enforced on the server, protected again in the client, and tied to real database-backed roles.
 
 ## What stands out
@@ -71,4 +73,15 @@ cd frontend && npm run build
 cd frontend && npm run test:e2e
 ```
 
-For deeper technical notes, see `docs/ARCHITECTURE.md`, `docs/API.md`, and `docs/SPRINT_1_STATUS.md`.
+## Delivery roadmap
+
+| Phase | Status | Main outcome |
+| --- | --- | --- |
+| Sprint 1 | Complete locally | Authentication, role-based access, starter workspaces |
+| Sprint 2 | Complete locally | Translator assignments, activity details, daily work records, history and filters |
+| Sprint 3 | Next | Weekly remaining estimates, finish rule, daily/weekly reminders |
+| Sprint 4 | Planned | Chief Editor checking and corrections |
+| Sprint 5 | Planned | Project Manager creation, assignment, workload and risk monitoring |
+| Sprint 6 | Planned | Integrated alpha workflow and demonstration |
+
+See [Sprint 2 status](docs/SPRINT_2_STATUS.md) for delivered behavior and verification, [Sprint 3 plan](docs/SPRINT_3_PLAN.md) for the next scope and open policy choices, [architecture](docs/ARCHITECTURE.md) for the current structure, and [API contract](docs/API.md) for implemented endpoints. The current status and latest test results are in [STATE.md](docs/STATE.md).

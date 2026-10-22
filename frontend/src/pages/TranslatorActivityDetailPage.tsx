@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
-import { AlertCircle, ArrowLeft, ClipboardList, Pencil, Plus, RefreshCw, Save } from 'lucide-react'
-import { Link, useParams } from 'react-router-dom'
+import { AlertCircle, ChevronDown, ClipboardList, Pencil, Plus, RefreshCw, Save } from 'lucide-react'
+import { useLocation, useParams } from 'react-router-dom'
+import { Breadcrumbs } from '../components/Breadcrumbs'
 import { WorkspaceLayout } from '../components/WorkspaceLayout'
 import { activityStatusLabels, formatDate, formatVolume, formatWorkHours, statusClassName, toNumberOrNull } from '../lib/activity-format'
 import { ApiError, translatorActivityApi } from '../lib/api'
@@ -50,6 +51,7 @@ function workTimePayload(hoursValue: string, minutesValue: string): number | nul
 
 export function TranslatorActivityDetailPage() {
   const { activityId } = useParams()
+  const location = useLocation()
   const [activity, setActivity] = useState<ActivityDetail | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
@@ -62,9 +64,16 @@ export function TranslatorActivityDetailPage() {
   const [formSuccess, setFormSuccess] = useState<string | null>(null)
   const [isSaving, setIsSaving] = useState(false)
   const [editingRecordId, setEditingRecordId] = useState<number | null>(null)
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false)
+  const [historyFrom, setHistoryFrom] = useState('')
+  const [historyTo, setHistoryTo] = useState('')
   const todayLocal = todayLocalDateString()
   const latestAllowedDate = latestAllowedRecordDateString()
   const workRecords = useMemo(() => activity?.workRecords ?? [], [activity?.workRecords])
+  const isHistoryRangeInvalid = Boolean(historyFrom && historyTo && historyFrom > historyTo)
+  const visibleWorkRecords = useMemo(() => workRecords.filter((record) => (
+    (!historyFrom || record.recordDate >= historyFrom) && (!historyTo || record.recordDate <= historyTo)
+  )), [historyFrom, historyTo, workRecords])
   const todayRecord = useMemo(
     () => workRecords.find((record) => record.recordDate === todayLocal) ?? null,
     [workRecords, todayLocal],
@@ -216,10 +225,10 @@ export function TranslatorActivityDetailPage() {
       title="Activity details"
     >
       <div className="workspace-content translator-workspace">
-        <Link className="back-link" to="/translator">
-          <ArrowLeft size={17} aria-hidden="true" />
-          Activities
-        </Link>
+        <Breadcrumbs items={[
+          { label: 'Activities', to: `/translator${location.search}` },
+          { label: activity?.activityNumber ?? 'Activity' },
+        ]} />
 
         {isLoading && (
           <section className="activity-detail activity-detail--loading" aria-busy="true" aria-label="Loading activity details">
@@ -402,52 +411,96 @@ export function TranslatorActivityDetailPage() {
             </section>
 
             <section className="record-section" aria-labelledby="history-title">
-              <div className="section-heading">
-                <h2 id="history-title">Daily history</h2>
-                <p>{activity.responsible ? 'Responsible translator' : 'Assisting translator'}</p>
+              <div className="history-disclosure">
+                <div>
+                  <h2 id="history-title">Daily history</h2>
+                  <p>{workRecords.length} {workRecords.length === 1 ? 'record' : 'records'} · {activity.responsible ? 'Responsible' : 'Assisting'} translator</p>
+                </div>
+                <button
+                  aria-controls="daily-history-content"
+                  aria-expanded={isHistoryOpen}
+                  className="button button--secondary history-disclosure__toggle"
+                  onClick={() => setIsHistoryOpen((open) => !open)}
+                  type="button"
+                >
+                  {isHistoryOpen ? 'Hide history' : 'Show history'}
+                  <ChevronDown aria-hidden="true" className={isHistoryOpen ? 'history-disclosure__chevron history-disclosure__chevron--open' : 'history-disclosure__chevron'} size={17} />
+                </button>
               </div>
 
-              {workRecords.length === 0 ? (
-                <div className="empty-state empty-state--compact">
-                  <h3>No daily records yet</h3>
-                  <p>Recorded translated volume will appear here.</p>
-                </div>
-              ) : (
-                <div className="record-table-wrapper">
-                  <table className="record-table">
-                    <thead>
-                      <tr>
-                        <th scope="col">Date</th>
-                        <th scope="col">Translated volume</th>
-                        <th scope="col">Work hours</th>
-                        <th scope="col">
-                          <span className="sr-only">Actions</span>
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {workRecords.map((record) => (
-                        <tr className={recordMatches(record, editingRecordId) ? 'record-table__row--selected' : undefined} key={record.id}>
-                          <td>{formatDate(record.recordDate)}</td>
-                          <td>{formatVolume(record.translatedVolume)}</td>
-                          <td>{formatWorkHours(record.workHours)}</td>
-                          <td>
-                            <button
-                              className="button button--ghost button--compact"
-                              disabled={isSaving}
-                              type="button"
-                              onClick={() => fillFormFromRecord(record)}
-                            >
-                              <Pencil size={16} aria-hidden="true" />
-                              Edit
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
+              <div className="history-content" hidden={!isHistoryOpen} id="daily-history-content">
+                  <div aria-label="Filter daily history by date" className="history-toolbar" role="group">
+                    <div className="field-group">
+                      <label htmlFor="history-from">From date</label>
+                      <input
+                        aria-invalid={isHistoryRangeInvalid}
+                        id="history-from"
+                        onChange={(event) => setHistoryFrom(event.target.value)}
+                        type="date"
+                        value={historyFrom}
+                      />
+                    </div>
+                    <div className="field-group">
+                      <label htmlFor="history-to">To date</label>
+                      <input
+                        aria-invalid={isHistoryRangeInvalid}
+                        id="history-to"
+                        onChange={(event) => setHistoryTo(event.target.value)}
+                        type="date"
+                        value={historyTo}
+                      />
+                    </div>
+                    <button
+                      className="button button--ghost button--compact"
+                      disabled={!historyFrom && !historyTo}
+                      onClick={() => { setHistoryFrom(''); setHistoryTo('') }}
+                      type="button"
+                    >
+                      Clear dates
+                    </button>
+                  </div>
+                  {isHistoryRangeInvalid ? (
+                    <p className="history-range-error" role="alert">The start date must be on or before the end date.</p>
+                  ) : visibleWorkRecords.length === 0 ? (
+                    <div className="empty-state empty-state--compact">
+                      <h3>{workRecords.length === 0 ? 'No daily records yet' : 'No records in this period'}</h3>
+                      <p>{workRecords.length === 0 ? 'Recorded translated volume will appear here.' : 'Choose a wider date range or clear the dates.'}</p>
+                    </div>
+                  ) : (
+                    <div className="record-table-wrapper">
+                      <table className="record-table">
+                        <thead>
+                          <tr>
+                            <th scope="col">Date</th>
+                            <th scope="col">Translated volume</th>
+                            <th scope="col">Work hours</th>
+                            <th scope="col"><span className="sr-only">Actions</span></th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {visibleWorkRecords.map((record) => (
+                            <tr className={recordMatches(record, editingRecordId) ? 'record-table__row--selected' : undefined} key={record.id}>
+                              <td data-label="Date">{formatDate(record.recordDate)}</td>
+                              <td data-label="Volume">{formatVolume(record.translatedVolume)}</td>
+                              <td data-label="Work time">{formatWorkHours(record.workHours)}</td>
+                              <td>
+                                <button
+                                  className="button button--ghost button--compact"
+                                  disabled={isSaving}
+                                  type="button"
+                                  onClick={() => fillFormFromRecord(record)}
+                                >
+                                  <Pencil size={16} aria-hidden="true" />
+                                  Edit
+                                </button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+              </div>
             </section>
           </>
         )}

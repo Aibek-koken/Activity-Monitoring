@@ -1,37 +1,38 @@
 # Architecture
 
-Last updated: 2026-10-01
+Last updated: 2026-10-22
 
 ## Project Map
 
 - `backend/` is a Spring Boot 3 API. Entry point: `ActivityMonitoringApplication`.
 - `frontend/` is a React + TypeScript Vite app. Entry points: `frontend/src/main.tsx` and `frontend/src/App.tsx`.
 - `compose.yaml` runs local PostgreSQL on host port `55432`.
-- `backend/src/main/resources/db/migration/` contains Flyway migrations; current Sprint 1 schema is `app_users`.
+- `backend/src/main/resources/db/migration/` contains Flyway migrations: V1 creates users, V2 adds projects/activities/assignments/work records, and V3 renames the translated-volume column. Applied migrations are immutable.
 - `docs/` contains handoff, architecture, design, API, status, and run notes.
 
 ## Backend Structure
 
 The backend is a layered modular monolith:
 
-- `controller` exposes HTTP endpoints for auth and workspace checks.
-- `service` handles login, JWT creation, and database-backed user loading.
-- `repository` owns JPA access to `app_users`.
-- `model` contains `User` and `Role`.
+- `controller` exposes auth/workspace checks and translator activity/work-record endpoints.
+- `service` handles auth and translator activity use cases, including assignment checks, record validation, and progress responses.
+- `repository` owns JPA access to users, projects, activities, assignments, and work records.
+- `model` contains users/roles and the Sprint 2 activity domain.
 - `dto` contains request/response records.
 - `security` contains the authenticated principal and JWT filter.
-- `config` wires Spring Security, CORS, password hashing, CSRF, JWT filter registration, and demo seeding.
+- `config` wires Spring Security, CORS, password hashing, CSRF, JWT filter registration, and non-production demo seeding.
 - `common` contains JSON error shapes and exception/security error writers.
 
 Controllers call services; services use repositories; repositories work with models. Controllers should not query repositories directly.
 
 ## Frontend Structure
 
-- `App.tsx` defines routes: `/`, `/login`, `/translator`, `/chief-editor`, `/project-manager`, and `*`.
+- `App.tsx` defines routes: `/`, `/login`, `/translator`, `/translator/activities/:activityId`, `/chief-editor`, `/project-manager`, and `*`.
 - `auth/` owns in-memory session state and protected routing.
 - `lib/api.ts` is the HTTP boundary; it sends cookies and CSRF headers.
 - `lib/roles.ts` maps backend roles to labels and routes.
-- `pages/` contains the landing page, login page, starter workspace, and 404 page.
+- `pages/` contains landing/login, the translator list and detail screens, starter editor/manager workspaces, and 404.
+- `types/activity.ts` defines translator activity API shapes; `lib/activity-format.ts` and `lib/validation.ts` support display and form validation.
 - `styles.css` holds shared product styling; `landing.css` holds landing-page styling.
 
 ## Data And Auth Flow
@@ -45,3 +46,14 @@ Controllers call services; services use repositories; repositories work with mod
 7. `SecurityConfig` enforces role access to each workspace endpoint.
 
 There is no self-registration flow in the current application.
+
+## Sprint 2 Activity Flow
+
+1. `GET /api/v1/translator/activities` scopes results to assignments for the authenticated translator. Optional `q` searches the activity number/name on the server. Assignment role, status, and assigned-date controls currently filter that authorized result in the client and persist in the URL.
+2. `GET /api/v1/translator/activities/{id}` checks the same assignment and returns detail, the translator's own work records, and cumulative translated volume.
+3. `POST`/`PUT` work-record endpoints validate the signed-in translator's assignment and data. The database enforces one record per translator/activity/date; creating the first record moves `ASSIGNED` to `IN_PROGRESS`.
+4. The history date range only changes which records the page displays. It does not change the server's cumulative total or the record form.
+
+## Sprint 3 Extension Point
+
+The next slice adds weekly estimates, the responsible translator's zero-remaining `FINISHED` transition, and reminders. Introduce them in the existing controller → service → repository layers, with a new Flyway migration and server-owned rules. `FINISHED` precedes editor checking; `COMPLETED` requires the later approval flow. See `SPRINT_3_PLAN.md` for scope and unresolved policy choices.

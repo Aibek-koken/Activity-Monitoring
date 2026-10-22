@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -94,9 +94,9 @@ const activityWithoutRecords = {
   workRecords: [],
 } as unknown as ActivityDetail
 
-function renderPage() {
+function renderPage(url = '/translator/activities/101') {
   return render(
-    <MemoryRouter initialEntries={['/translator/activities/101']}>
+    <MemoryRouter initialEntries={[url]}>
       <Routes>
         <Route path="/translator/activities/:activityId" element={<TranslatorActivityDetailPage />} />
       </Routes>
@@ -128,6 +128,9 @@ describe('TranslatorActivityDetailPage', () => {
 
     renderPage()
 
+    await screen.findByRole('heading', { name: 'Daily history' })
+    expect(screen.queryByRole('heading', { name: 'No daily records yet' })).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Show history' }))
     expect(await screen.findByRole('heading', { name: 'No daily records yet' })).toBeInTheDocument()
     expect(screen.getByText('Recorded translated volume will appear here.')).toBeInTheDocument()
   })
@@ -161,7 +164,9 @@ describe('TranslatorActivityDetailPage', () => {
     renderPage()
 
     expect(await screen.findByRole('heading', { name: 'Privacy policy translation' })).toBeInTheDocument()
-    expect(screen.getByText('EL-2026-001')).toBeInTheDocument()
+    expect(screen.getAllByText('EL-2026-001')).toHaveLength(2)
+    expect(screen.queryByRole('button', { name: 'Edit' })).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Show history' }))
     expect(screen.getAllByText('8.25')).toHaveLength(2)
     expect(screen.getByText('2 h 30 min')).toBeInTheDocument()
   })
@@ -172,6 +177,7 @@ describe('TranslatorActivityDetailPage', () => {
     renderPage()
 
     expect(await screen.findByRole('heading', { name: 'Onboarding email sequence' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Show history' }))
     expect(screen.getByRole('row', { name: /Sep 30, 2026/ })).toHaveTextContent('Not entered')
     expect(screen.getByRole('row', { name: /Sep 29, 2026/ })).toHaveTextContent('Not entered')
     expect(screen.getByRole('row', { name: /Sep 28, 2026/ })).toHaveTextContent('3 h')
@@ -223,7 +229,9 @@ describe('TranslatorActivityDetailPage', () => {
 
     renderPage()
 
-    expect(await screen.findByRole('heading', { name: 'No daily records yet' })).toBeInTheDocument()
+    await screen.findByRole('heading', { name: 'Daily history' })
+    fireEvent.click(screen.getByRole('button', { name: 'Show history' }))
+    expect(screen.getByRole('heading', { name: 'No daily records yet' })).toBeInTheDocument()
     expect(screen.getAllByText('No records yet').length).toBeGreaterThan(0)
     expect(screen.getByRole('heading', { name: 'Record translated volume' })).toBeInTheDocument()
   })
@@ -311,6 +319,7 @@ describe('TranslatorActivityDetailPage', () => {
     renderPage()
 
     await screen.findByRole('heading', { name: 'Record translated volume' })
+    await user.click(screen.getByRole('button', { name: 'Show history' }))
     await user.click(screen.getAllByRole('button', { name: 'Edit' })[1])
 
     expect(screen.getByRole('heading', { name: 'Edit daily record' })).toBeInTheDocument()
@@ -325,5 +334,67 @@ describe('TranslatorActivityDetailPage', () => {
       translatedVolume: 6.25,
       workHours: null,
     })
+  })
+
+  it('returns to the same list filters through the breadcrumb', async () => {
+    vi.mocked(translatorActivityApi.get).mockResolvedValue(baseActivity)
+
+    renderPage('/translator/activities/101?q=privacy&assignment=responsible')
+
+    await screen.findByRole('heading', { name: 'Privacy policy translation' })
+    const breadcrumb = await screen.findByRole('navigation', { name: 'Breadcrumb' })
+    expect(within(breadcrumb).getByRole('link', { name: 'Activities' })).toHaveAttribute(
+      'href', '/translator?q=privacy&assignment=responsible',
+    )
+    expect(within(breadcrumb).getByText('EL-2026-001')).toHaveAttribute('aria-current', 'page')
+  })
+
+  it('filters the expanded history by inclusive dates and restores all records', async () => {
+    vi.mocked(translatorActivityApi.get).mockResolvedValue({
+      ...baseActivity,
+      progress: { lastRecordDate: '2026-09-30', recordCount: 3, totalTranslatedVolume: 18 },
+      workRecords: [
+        { id: 703, recordDate: '2026-09-30', translatedVolume: 7 },
+        { id: 702, recordDate: '2026-09-29', translatedVolume: 6 },
+        { id: 701, recordDate: '2026-09-28', translatedVolume: 5 },
+      ],
+    })
+
+    renderPage()
+    await screen.findByRole('heading', { name: 'Daily history' })
+    fireEvent.click(screen.getByRole('button', { name: 'Show history' }))
+    expect(screen.getAllByRole('button', { name: 'Edit' })).toHaveLength(3)
+
+    fireEvent.change(screen.getByLabelText('From date'), { target: { value: '2026-09-29' } })
+    fireEvent.change(screen.getByLabelText('To date'), { target: { value: '2026-09-30' } })
+    expect(screen.getAllByRole('button', { name: 'Edit' })).toHaveLength(2)
+    expect(screen.getByRole('row', { name: /Sep 29, 2026/ })).toBeInTheDocument()
+    expect(screen.queryByRole('row', { name: /Sep 28, 2026/ })).not.toBeInTheDocument()
+
+    fireEvent.change(screen.getByLabelText('From date'), { target: { value: '2026-10-01' } })
+    expect(screen.getByRole('alert')).toHaveTextContent('The start date must be on or before the end date.')
+    expect(screen.queryByRole('button', { name: 'Edit' })).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Clear dates' }))
+    expect(screen.getByLabelText('From date')).toHaveValue('')
+    expect(screen.getByLabelText('To date')).toHaveValue('')
+    expect(screen.getAllByRole('button', { name: 'Edit' })).toHaveLength(3)
+  })
+
+  it('shows an empty date range without changing lifetime progress', async () => {
+    vi.mocked(translatorActivityApi.get).mockResolvedValue({
+      ...baseActivity,
+      progress: { lastRecordDate: '2026-09-30', recordCount: 1, totalTranslatedVolume: 8.25 },
+      workRecords: [{ id: 701, recordDate: '2026-09-30', translatedVolume: 8.25 }],
+    })
+
+    renderPage()
+    await screen.findByRole('heading', { name: 'Daily history' })
+    fireEvent.click(screen.getByRole('button', { name: 'Show history' }))
+    fireEvent.change(screen.getByLabelText('To date'), { target: { value: '2026-09-29' } })
+
+    expect(screen.getByRole('heading', { name: 'No records in this period' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Record translated volume' })).toBeInTheDocument()
+    expect(screen.getAllByText('8.25')).toHaveLength(1)
   })
 })
