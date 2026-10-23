@@ -4,6 +4,8 @@ Last updated: 2026-10-22
 
 Status: complete locally; Sprint 3 is next. This records implementation status, not a claim that Sprint 2 has been deployed or merged.
 
+For the full implementation history, technical changes, problems solved, verification evidence, and demonstration flow, see `SPRINT_2_PROCESS_REPORT.md`.
+
 ## Delivered scope
 
 The approved translator slice (US-03 through US-07) is implemented:
@@ -17,7 +19,7 @@ The approved translator slice (US-03 through US-07) is implemented:
 ## Boundaries and follow-up
 
 - Current progress is the cumulative translated volume of the signed-in translator. It is not an estimated total or a delivery-risk indicator.
-- Weekly remaining-text estimates, zero-remaining completion, and reminders belong to Sprint 3. Editor review/corrections and manager staffing/monitoring belong to later sprints.
+- Weekly remaining-text estimates, reminders, zero-remaining finish, and submission for checking belong to Sprint 3. Editor review/corrections and manager staffing/monitoring belong to later sprints.
 - The separate staffing limits of 5 active responsible and 10 active assisting assignments are documented for the future manager assignment workflow; they are not enforced by the current demo seeder.
 - The business unit for translated/remaining volume is still unspecified in the available requirements. The UI uses generic volume units.
 

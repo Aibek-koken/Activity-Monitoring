@@ -120,6 +120,17 @@ X-XSRF-TOKEN: e1dc9929-bc0c-425a-b5c0-a3015b465e17
 }
 
 
+### 19. Save or update this week's remaining volume (responsible translator only)
+### Get a fresh CSRF token first with request 2.
+PUT {{baseUrl}}/v1/translator/activities/{{activityId}}/weekly-estimates/current
+Content-Type: application/json
+X-XSRF-TOKEN: ВСТАВЬ_CSRF_TOKEN_ИЗ_ПРЕДЫДУЩЕГО_ОТВЕТА
+
+{
+  "remainingTextVolume": 120.50
+}
+
+
 ### 19. PUT invalid work hours should fail
 PUT {{baseUrl}}/v1/translator/activities/{{activityId}}/work-records/{{recordId}}
 Content-Type: application/json

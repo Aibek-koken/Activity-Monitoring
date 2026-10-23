@@ -1,22 +1,31 @@
 package com.easylang.activitymonitoring.service;
 
 import com.easylang.activitymonitoring.dto.TranslatorActivityDtos.ActivityDetailResponse;
+import com.easylang.activitymonitoring.dto.TranslatorActivityDtos.ActivityPermissionsResponse;
 import com.easylang.activitymonitoring.dto.TranslatorActivityDtos.ActivityListResponse;
 import com.easylang.activitymonitoring.dto.TranslatorActivityDtos.ActivitySummaryResponse;
+import com.easylang.activitymonitoring.dto.TranslatorActivityDtos.CurrentWeekResponse;
 import com.easylang.activitymonitoring.dto.TranslatorActivityDtos.CreateWorkRecordRequest;
 import com.easylang.activitymonitoring.dto.TranslatorActivityDtos.ProgressResponse;
 import com.easylang.activitymonitoring.dto.TranslatorActivityDtos.UpdateWorkRecordRequest;
 import com.easylang.activitymonitoring.dto.TranslatorActivityDtos.WorkRecordResponse;
+import com.easylang.activitymonitoring.dto.TranslatorActivityDtos.WeeklyEstimateResponse;
 import com.easylang.activitymonitoring.model.Activity;
 import com.easylang.activitymonitoring.model.ActivityTranslator;
+import com.easylang.activitymonitoring.model.ActivityStatus;
 import com.easylang.activitymonitoring.model.WorkRecord;
+import com.easylang.activitymonitoring.model.WeeklyEstimate;
 import com.easylang.activitymonitoring.repository.ActivityRepository;
 import com.easylang.activitymonitoring.repository.ActivityTranslatorRepository;
 import com.easylang.activitymonitoring.repository.WorkRecordRepository;
+import com.easylang.activitymonitoring.repository.WeeklyEstimateRepository;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.Clock;
+import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
+import java.time.temporal.TemporalAdjusters;
 import java.util.List;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -29,15 +38,21 @@ public class TranslatorActivityService {
     private final ActivityRepository activityRepository;
     private final ActivityTranslatorRepository activityTranslatorRepository;
     private final WorkRecordRepository workRecordRepository;
+    private final WeeklyEstimateRepository weeklyEstimateRepository;
+    private final Clock businessClock;
 
     public TranslatorActivityService(
             ActivityRepository activityRepository,
             ActivityTranslatorRepository activityTranslatorRepository,
-            WorkRecordRepository workRecordRepository
+            WorkRecordRepository workRecordRepository,
+            WeeklyEstimateRepository weeklyEstimateRepository,
+            Clock businessClock
     ) {
         this.activityRepository = activityRepository;
         this.activityTranslatorRepository = activityTranslatorRepository;
         this.workRecordRepository = workRecordRepository;
+        this.weeklyEstimateRepository = weeklyEstimateRepository;
+        this.businessClock = businessClock;
     }
 
     @Transactional(readOnly = true)
@@ -67,6 +82,7 @@ public class TranslatorActivityService {
             CreateWorkRecordRequest request
     ) {
         Activity activity = assignedActivity(translatorId, activityId);
+        requireEditable(activity);
         rejectFutureDate(request.recordDate());
 
         workRecordRepository.findByActivityIdAndTranslatorIdAndRecordDate(
@@ -97,6 +113,7 @@ public class TranslatorActivityService {
             UpdateWorkRecordRequest request
     ) {
         Activity activity = assignedActivity(translatorId, activityId);
+        requireEditable(activity);
         WorkRecord record = workRecordRepository.findByIdAndActivityIdAndTranslatorId(recordId, activityId, translatorId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Work record not found"));
 
@@ -122,6 +139,18 @@ public class TranslatorActivityService {
 
     private ActivityDetailResponse toDetail(Activity activity, Long translatorId) {
         ActivityTranslator assignment = assignment(activity.getId(), translatorId);
+        LocalDate weekStart = LocalDate.now(businessClock).with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
+        List<WeeklyEstimateResponse> weeklyEstimates = weeklyEstimateRepository
+                .findByActivityIdOrderByWeekStartDateDesc(activity.getId())
+                .stream()
+                .map(this::toWeeklyEstimate)
+                .toList();
+        WeeklyEstimateResponse currentEstimate = weeklyEstimates.stream()
+                .filter(estimate -> estimate.weekStartDate().equals(weekStart))
+                .findFirst()
+                .orElse(null);
+        boolean active = activity.getStatus() == ActivityStatus.ASSIGNED
+                || activity.getStatus() == ActivityStatus.IN_PROGRESS;
         List<WorkRecordResponse> workRecords = workRecordRepository
                 .findByActivityIdAndTranslatorIdOrderByRecordDateDescIdDesc(activity.getId(), translatorId)
                 .stream()
@@ -138,13 +167,40 @@ public class TranslatorActivityService {
                 assignment.getAssignedDate(),
                 activity.getCreatedDate(),
                 progress(activity.getId(), translatorId),
-                workRecords
+                workRecords,
+                new CurrentWeekResponse(weekStart, weekStart.plusDays(6)),
+                currentEstimate,
+                weeklyEstimates,
+                new ActivityPermissionsResponse(
+                        active,
+                        active && assignment.isResponsible(),
+                        active && assignment.isResponsible() && currentEstimate != null
+                                && currentEstimate.remainingTextVolume().signum() == 0,
+                        activity.getStatus() == ActivityStatus.FINISHED && assignment.isResponsible()
+                )
         );
     }
 
+    private WeeklyEstimateResponse toWeeklyEstimate(WeeklyEstimate estimate) {
+        return new WeeklyEstimateResponse(
+                estimate.getId(),
+                estimate.getWeekStartDate(),
+                estimate.getRemainingTextVolume(),
+                estimate.getUpdatedAt()
+        );
+    }
+
+    private void requireEditable(Activity activity) {
+        if (activity.getStatus() != ActivityStatus.ASSIGNED && activity.getStatus() != ActivityStatus.IN_PROGRESS) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Work records are locked for this activity");
+        }
+    }
+
     private Activity assignedActivity(Long translatorId, Long activityId) {
-        return activityRepository.findAssignedToTranslatorById(translatorId, activityId)
+        Activity activity = activityRepository.findByIdForUpdate(activityId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Activity not found"));
+        assignment(activityId, translatorId);
+        return activity;
     }
 
     private ProgressResponse progress(Long activityId, Long translatorId) {

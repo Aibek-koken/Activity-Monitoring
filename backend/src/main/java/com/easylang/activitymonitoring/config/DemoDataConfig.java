@@ -4,12 +4,14 @@ import com.easylang.activitymonitoring.model.Activity;
 import com.easylang.activitymonitoring.model.ActivityStatus;
 import com.easylang.activitymonitoring.model.ActivityTranslator;
 import com.easylang.activitymonitoring.model.Project;
+import com.easylang.activitymonitoring.model.ProjectChiefEditor;
 import com.easylang.activitymonitoring.model.Role;
 import com.easylang.activitymonitoring.model.User;
 import com.easylang.activitymonitoring.model.WorkRecord;
 import com.easylang.activitymonitoring.repository.ActivityRepository;
 import com.easylang.activitymonitoring.repository.ActivityTranslatorRepository;
 import com.easylang.activitymonitoring.repository.ProjectRepository;
+import com.easylang.activitymonitoring.repository.ProjectChiefEditorRepository;
 import com.easylang.activitymonitoring.repository.UserRepository;
 import com.easylang.activitymonitoring.repository.WorkRecordRepository;
 import java.math.BigDecimal;
@@ -32,6 +34,7 @@ public class DemoDataConfig implements ApplicationRunner {
 
     private final UserRepository userRepository;
     private final ProjectRepository projectRepository;
+    private final ProjectChiefEditorRepository projectChiefEditorRepository;
     private final ActivityRepository activityRepository;
     private final ActivityTranslatorRepository activityTranslatorRepository;
     private final WorkRecordRepository workRecordRepository;
@@ -40,6 +43,7 @@ public class DemoDataConfig implements ApplicationRunner {
     public DemoDataConfig(
             UserRepository userRepository,
             ProjectRepository projectRepository,
+            ProjectChiefEditorRepository projectChiefEditorRepository,
             ActivityRepository activityRepository,
             ActivityTranslatorRepository activityTranslatorRepository,
             WorkRecordRepository workRecordRepository,
@@ -47,6 +51,7 @@ public class DemoDataConfig implements ApplicationRunner {
     ) {
         this.userRepository = userRepository;
         this.projectRepository = projectRepository;
+        this.projectChiefEditorRepository = projectChiefEditorRepository;
         this.activityRepository = activityRepository;
         this.activityTranslatorRepository = activityTranslatorRepository;
         this.workRecordRepository = workRecordRepository;
@@ -68,6 +73,7 @@ public class DemoDataConfig implements ApplicationRunner {
         User translator = userRepository.findByEmailIgnoreCase("translator@easylang.local").orElseThrow();
         User secondTranslator = userRepository.findByEmailIgnoreCase("translator2@easylang.local").orElseThrow();
         User manager = userRepository.findByEmailIgnoreCase("manager@easylang.local").orElseThrow();
+        User editor = userRepository.findByEmailIgnoreCase("editor@easylang.local").orElseThrow();
 
         Project legalPortal = findOrCreateProject(
                 "Central Asia Legal Portal",
@@ -79,6 +85,8 @@ public class DemoDataConfig implements ApplicationRunner {
                 manager,
                 LocalDate.of(2026, 9, 25)
         );
+        assignEditorIfMissing(legalPortal, editor);
+        assignEditorIfMissing(productLaunch, editor);
 
         Activity privacyPolicy = findOrCreateActivity(
                 "EL-2026-001",
@@ -170,6 +178,12 @@ public class DemoDataConfig implements ApplicationRunner {
     private void assignIfMissing(Activity activity, User translator, boolean responsible, LocalDate assignedDate) {
         if (!activityTranslatorRepository.existsByActivityIdAndTranslatorId(activity.getId(), translator.getId())) {
             activityTranslatorRepository.save(new ActivityTranslator(activity, translator, responsible, assignedDate));
+        }
+    }
+
+    private void assignEditorIfMissing(Project project, User editor) {
+        if (!projectChiefEditorRepository.existsByProjectIdAndChiefEditorId(project.getId(), editor.getId())) {
+            projectChiefEditorRepository.save(new ProjectChiefEditor(project, editor, true));
         }
     }
 

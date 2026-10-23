@@ -1,6 +1,6 @@
 # AGENTS.md
 
-EasyLang Activity Monitoring is a Spring Boot + React/Vite monorepo for a translation-house activity monitoring system. Sprints 1 and 2 are complete locally: authentication, role-based access, translator assigned activities, and daily work records. Sprint 3 (weekly estimates, finish rule, reminders) is planned but not implemented.
+EasyLang Activity Monitoring is a Spring Boot + React/Vite monorepo for a translation-house activity monitoring system. Sprints 1 and 2 are complete locally: authentication, role-based access, translator assigned activities, and daily work records. Sprint 3 (weekly estimates, reminders, finish and submission for checking) is planned but not implemented.
 
 ## Read First
 

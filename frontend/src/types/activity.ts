@@ -42,6 +42,22 @@ export interface WorkRecord {
 export interface ActivityDetail extends ActivitySummary {
   createdDate: string
   workRecords: WorkRecord[]
+  currentWeek: { startDate: string; endDate: string }
+  currentWeekEstimate?: WeeklyEstimate | null
+  weeklyEstimates: WeeklyEstimate[]
+  permissions: {
+    canEditWorkRecords: boolean
+    canEditWeeklyEstimate: boolean
+    canFinish: boolean
+    canSubmitForChecking: boolean
+  }
+}
+
+export interface WeeklyEstimate {
+  id: number
+  weekStartDate: string
+  remainingTextVolume: number
+  updatedAt: string
 }
 
 export interface CreateWorkRecordPayload {

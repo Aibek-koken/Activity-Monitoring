@@ -1074,6 +1074,54 @@ p { margin-top: 0; }
   background: var(--surface);
 }
 
+.estimate-panel__current {
+  align-self: center;
+  color: var(--foreground);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.estimate-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 12px;
+}
+
+.estimate-form .field-group { width: min(100%, 270px); }
+.estimate-form .button { min-height: 44px; }
+
+.estimate-panel__note {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.estimate-history {
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
+.estimate-history__list {
+  display: grid;
+  gap: 0;
+  margin: 10px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.estimate-history__list li {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 0;
+  border-top: 1px solid var(--border);
+  font-size: 13px;
+}
+
+.estimate-history__list li strong { font-weight: 700; }
+
 .work-record-form {
   display: grid;
   grid-template-columns: minmax(145px, 1fr) minmax(180px, 1.1fr) minmax(160px, 0.8fr) minmax(105px, 0.6fr) auto;
@@ -1383,6 +1431,7 @@ p { margin-top: 0; }
   .activity-filter-popover__dates { grid-template-columns: 1fr; }
 
   .work-record-form .field-group label { min-height: 0; }
+  .estimate-form .field-group, .estimate-form .button { width: 100%; }
 
   .record-table-wrapper { border: 0; background: transparent; }
   .record-table { min-width: 0; border-collapse: separate; }

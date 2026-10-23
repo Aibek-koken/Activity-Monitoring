@@ -6,6 +6,7 @@ import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Digits;
 import jakarta.validation.constraints.NotNull;
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
 
@@ -38,7 +39,38 @@ public final class TranslatorActivityDtos {
             LocalDate assignedDate,
             LocalDate createdDate,
             ProgressResponse progress,
-            List<WorkRecordResponse> workRecords
+            List<WorkRecordResponse> workRecords,
+            CurrentWeekResponse currentWeek,
+            WeeklyEstimateResponse currentWeekEstimate,
+            List<WeeklyEstimateResponse> weeklyEstimates,
+            ActivityPermissionsResponse permissions
+    ) {
+    }
+
+    public record CurrentWeekResponse(LocalDate startDate, LocalDate endDate) {
+    }
+
+    public record WeeklyEstimateResponse(
+            Long id,
+            LocalDate weekStartDate,
+            BigDecimal remainingTextVolume,
+            Instant updatedAt
+    ) {
+    }
+
+    public record ActivityPermissionsResponse(
+            boolean canEditWorkRecords,
+            boolean canEditWeeklyEstimate,
+            boolean canFinish,
+            boolean canSubmitForChecking
+    ) {
+    }
+
+    public record SaveWeeklyEstimateRequest(
+            @NotNull(message = "Remaining volume is required")
+            @DecimalMin(value = "0.00", message = "Remaining volume cannot be negative")
+            @Digits(integer = 12, fraction = 2, message = "Remaining volume can have up to 2 decimal places")
+            BigDecimal remainingTextVolume
     ) {
     }
 

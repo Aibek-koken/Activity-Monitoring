@@ -24,7 +24,7 @@ Landing-only tokens live in `frontend/src/landing.css`: dark slate hero (`--land
 - `LandingPage` uses a full-viewport dark hero, monitoring preview, capability blocks, activity flow, role cards, final CTA, and footer.
 - `WorkspacePage` uses a protected starter workspace shell with role-specific labels and logout.
 - `TranslatorActivitiesPage` uses a breadcrumb, a restrained page title, search, and a compact All / Responsible / Assisting assignment filter. A filter button opens status and assigned-date controls; there is no top summary-card row.
-- `TranslatorActivityDetailPage` uses a breadcrumb and keeps daily history collapsed until requested. Its history toolbar filters records by an inclusive date range, independently of the entry form and lifetime progress.
+- `TranslatorActivityDetailPage` uses a breadcrumb, a compact weekly-remaining panel, and a collapsed estimate history. It keeps daily history collapsed until requested; its date toolbar filters records by an inclusive range, independently of the entry form and lifetime progress.
 - `FullPageStatus` and `NotFoundPage` provide status/error states.
 
 ## UX Rules Already Used
@@ -44,4 +44,4 @@ Landing-only tokens live in `frontend/src/landing.css`: dark slate hero (`--land
 
 ## Sprint 3 UI Direction
 
-Weekly remaining estimates should live on the existing translator activity detail page, with the current value and dated history easy to distinguish from cumulative translated volume. Show a finish action only for an eligible responsible translator and explain that `FINISHED` awaits Chief Editor checking. Reminders should be compact, actionable links to the relevant activity; the delivery channel and schedule are still to be settled in `SPRINT_3_PLAN.md`. Reuse the current tokens, form/error conventions, and responsive behavior.
+The weekly remaining panel now lives above the daily form on the existing translator detail page. The responsible translator can save the current week's value; assistants see it read-only. Estimate history starts collapsed. The next UI stage adds Finish only for an eligible responsible translator, then Submit for checking in `FINISHED`. Reminders should be compact actionable links, and submitted activities should replace editable forms with a clear `UNDER_CHECKING` state. Reuse the current tokens, form/error conventions, and responsive behavior.

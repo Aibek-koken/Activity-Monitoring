@@ -45,7 +45,7 @@ See `SPRINT_1_STATUS.md` and `SPRINT_2_STATUS.md` for delivered scope, `ARCHITEC
 ## Planned sequence
 
 1. Sprint 2 — complete locally: Project/Activity foundation, Translator activity list/details, daily work records.
-2. Sprint 3 — next: weekly remaining-text estimates, `FINISHED` when the responsible translator reports zero remaining, daily/weekly reminders.
+2. Sprint 3 — next: daily/weekly reminders, weekly remaining-text estimates, `FINISHED` at zero remaining, and submission for Chief Editor checking.
 3. Sprint 4 — Chief Editor review and correction cycle.
 4. Sprint 5 — Project Manager staffing, monitoring, estimated-total trend, risk flags.
 5. Sprint 6 — integrated workflow, alpha testing, demonstration.

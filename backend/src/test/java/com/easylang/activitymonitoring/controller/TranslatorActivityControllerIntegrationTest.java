@@ -8,6 +8,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import com.easylang.activitymonitoring.model.Activity;
 import com.easylang.activitymonitoring.model.ActivityTranslator;
@@ -17,6 +18,7 @@ import com.easylang.activitymonitoring.repository.ActivityRepository;
 import com.easylang.activitymonitoring.repository.ActivityTranslatorRepository;
 import com.easylang.activitymonitoring.repository.UserRepository;
 import com.easylang.activitymonitoring.repository.WorkRecordRepository;
+import com.easylang.activitymonitoring.repository.WeeklyEstimateRepository;
 import com.easylang.activitymonitoring.security.JwtAuthenticationFilter;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -57,6 +59,9 @@ class TranslatorActivityControllerIntegrationTest {
 
     @Autowired
     private WorkRecordRepository workRecordRepository;
+
+    @Autowired
+    private WeeklyEstimateRepository weeklyEstimateRepository;
 
     @Test
     void unauthenticatedUserCannotListTranslatorActivities() throws Exception {
@@ -146,6 +151,81 @@ class TranslatorActivityControllerIntegrationTest {
                 .andExpect(jsonPath("$.progress.recordCount").value(2))
                 .andExpect(jsonPath("$.progress.lastRecordDate").value("2026-09-30"))
                 .andExpect(jsonPath("$.workRecords[0].translatedVolume").value(8.25));
+    }
+
+    @Test
+    void responsibleTranslatorUpdatesOneEstimateForCurrentWeek() throws Exception {
+        Cookie accessCookie = login("translator@easylang.local");
+        Csrf csrf = csrf();
+        Long activityId = activityRepository.findByActivityNumber("EL-2026-001").orElseThrow().getId();
+
+        mockMvc.perform(put("/api/v1/translator/activities/{activityId}/weekly-estimates/current", activityId)
+                        .cookie(accessCookie, csrf.cookie())
+                        .header(csrf.headerName(), csrf.token())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"remainingTextVolume":120.50}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.currentWeekEstimate.remainingTextVolume").value(120.50))
+                .andExpect(jsonPath("$.weeklyEstimates.length()").value(1))
+                .andExpect(jsonPath("$.permissions.canFinish").value(false));
+
+        mockMvc.perform(put("/api/v1/translator/activities/{activityId}/weekly-estimates/current", activityId)
+                        .cookie(accessCookie, csrf.cookie())
+                        .header(csrf.headerName(), csrf.token())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"remainingTextVolume":0}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.currentWeekEstimate.remainingTextVolume").value(0))
+                .andExpect(jsonPath("$.permissions.canFinish").value(true));
+        assertEquals(1, weeklyEstimateRepository.findByActivityIdOrderByWeekStartDateDesc(activityId).size());
+    }
+
+    @Test
+    void assistantCanReadButCannotSaveWeeklyEstimate() throws Exception {
+        Cookie accessCookie = login("translator@easylang.local");
+        Csrf csrf = csrf();
+        Long activityId = activityRepository.findByActivityNumber("EL-2026-003").orElseThrow().getId();
+
+        mockMvc.perform(get("/api/v1/translator/activities/{activityId}", activityId).cookie(accessCookie))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.permissions.canEditWeeklyEstimate").value(false));
+
+        mockMvc.perform(put("/api/v1/translator/activities/{activityId}/weekly-estimates/current", activityId)
+                        .cookie(accessCookie, csrf.cookie())
+                        .header(csrf.headerName(), csrf.token())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"remainingTextVolume":10}
+                                """))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void weeklyEstimateRequiresCsrfAndValidDecimal() throws Exception {
+        Cookie accessCookie = login("translator@easylang.local");
+        Long activityId = activityRepository.findByActivityNumber("EL-2026-001").orElseThrow().getId();
+
+        mockMvc.perform(put("/api/v1/translator/activities/{activityId}/weekly-estimates/current", activityId)
+                        .cookie(accessCookie)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"remainingTextVolume":1}
+                                """))
+                .andExpect(status().isForbidden());
+
+        Csrf csrf = csrf();
+        mockMvc.perform(put("/api/v1/translator/activities/{activityId}/weekly-estimates/current", activityId)
+                        .cookie(accessCookie, csrf.cookie())
+                        .header(csrf.headerName(), csrf.token())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"remainingTextVolume":-1.123}
+                                """))
+                .andExpect(status().isBadRequest());
     }
 
     @Test

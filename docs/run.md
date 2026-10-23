@@ -1,6 +1,6 @@
 # Run EasyLang locally
 
-Sprint 1 and Sprint 2 are complete locally. Sprint 3 is next; see `SPRINT_3_PLAN.md` for planned functionality. The commands below run the current Sprint 2 application.
+Sprint 1 and Sprint 2 are complete locally. Sprint 3 is in progress: weekly estimates are available, while finish/submission and reminders remain planned. The commands below run the current application.
 
 ## 1. PostgreSQL
 
@@ -71,6 +71,8 @@ ORDER BY a.activity_number;
 - `backend/src/main/java/.../model/ActivityStatus.java` — все статусы.
 
 - `backend/src/main/java/.../service/TranslatorActivityService.java` — главная бизнес-логика переводчика.
+
+- `backend/src/main/java/.../service/TranslatorProgressService.java` — сохранение недельной оценки.
 
 - `frontend/src/pages/TranslatorActivitiesPage.tsx` — список активностей.
 

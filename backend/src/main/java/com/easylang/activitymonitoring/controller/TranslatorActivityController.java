@@ -4,8 +4,10 @@ import com.easylang.activitymonitoring.dto.TranslatorActivityDtos.ActivityDetail
 import com.easylang.activitymonitoring.dto.TranslatorActivityDtos.ActivityListResponse;
 import com.easylang.activitymonitoring.dto.TranslatorActivityDtos.CreateWorkRecordRequest;
 import com.easylang.activitymonitoring.dto.TranslatorActivityDtos.UpdateWorkRecordRequest;
+import com.easylang.activitymonitoring.dto.TranslatorActivityDtos.SaveWeeklyEstimateRequest;
 import com.easylang.activitymonitoring.security.AuthenticatedUser;
 import com.easylang.activitymonitoring.service.TranslatorActivityService;
+import com.easylang.activitymonitoring.service.TranslatorProgressService;
 import jakarta.validation.Valid;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -22,9 +24,12 @@ import org.springframework.web.bind.annotation.RestController;
 public class TranslatorActivityController {
 
     private final TranslatorActivityService translatorActivityService;
+    private final TranslatorProgressService translatorProgressService;
 
-    public TranslatorActivityController(TranslatorActivityService translatorActivityService) {
+    public TranslatorActivityController(TranslatorActivityService translatorActivityService,
+                                        TranslatorProgressService translatorProgressService) {
         this.translatorActivityService = translatorActivityService;
+        this.translatorProgressService = translatorProgressService;
     }
 
     @GetMapping
@@ -60,5 +65,14 @@ public class TranslatorActivityController {
             @Valid @RequestBody UpdateWorkRecordRequest request
     ) {
         return translatorActivityService.updateWorkRecord(principal.user().getId(), activityId, recordId, request);
+    }
+
+    @PutMapping("/{activityId}/weekly-estimates/current")
+    public ActivityDetailResponse saveCurrentEstimate(
+            @AuthenticationPrincipal AuthenticatedUser principal,
+            @PathVariable Long activityId,
+            @Valid @RequestBody SaveWeeklyEstimateRequest request
+    ) {
+        return translatorProgressService.saveCurrentEstimate(principal.user().getId(), activityId, request);
     }
 }

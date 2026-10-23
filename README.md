@@ -10,7 +10,7 @@
 
 **Full-stack activity tracking system with secure authentication, role-based workspaces, and translator progress records.**
 
-**Project status:** Sprint 1 and Sprint 2 are complete locally. Sprint 3 is next and has not been implemented. Its scope is weekly remaining-text estimates, a `FINISHED` transition when the responsible translator reports zero remaining, and daily/weekly reminders.
+**Project status:** Sprint 1 and Sprint 2 are complete locally. Sprint 3 is in progress: the database foundation and weekly remaining-volume estimates are implemented. Daily/weekly reminders, the `FINISHED` transition, and submission for Chief Editor checking are next.
 
 The repository contains an independent Spring Boot API and React/TypeScript frontend. The strongest part of the project is the security and access model: authentication is enforced on the server, protected again in the client, and tied to real database-backed roles.
 
@@ -79,9 +79,9 @@ cd frontend && npm run test:e2e
 | --- | --- | --- |
 | Sprint 1 | Complete locally | Authentication, role-based access, starter workspaces |
 | Sprint 2 | Complete locally | Translator assignments, activity details, daily work records, history and filters |
-| Sprint 3 | Next | Weekly remaining estimates, finish rule, daily/weekly reminders |
+| Sprint 3 | In progress | Weekly remaining estimates implemented; reminders, finish and submission for checking next |
 | Sprint 4 | Planned | Chief Editor checking and corrections |
 | Sprint 5 | Planned | Project Manager creation, assignment, workload and risk monitoring |
 | Sprint 6 | Planned | Integrated alpha workflow and demonstration |
 
-See [Sprint 2 status](docs/SPRINT_2_STATUS.md) for delivered behavior and verification, [Sprint 3 plan](docs/SPRINT_3_PLAN.md) for the next scope and open policy choices, [architecture](docs/ARCHITECTURE.md) for the current structure, and [API contract](docs/API.md) for implemented endpoints. The current status and latest test results are in [STATE.md](docs/STATE.md).
+See [Sprint 2 status](docs/SPRINT_2_STATUS.md) for delivered behavior, the [Sprint 2 process report](docs/SPRINT_2_PROCESS_REPORT.md) for the full documentation handoff, and the [Sprint 3 plan](docs/SPRINT_3_PLAN.md) for the current scope and remaining stages. The current system is described in [architecture](docs/ARCHITECTURE.md), the [API contract](docs/API.md), and [STATE.md](docs/STATE.md).

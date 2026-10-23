@@ -108,6 +108,15 @@ export const translatorActivityApi = {
     return request<ActivityDetail>(`/v1/translator/activities/${activityId}`)
   },
 
+  async saveCurrentEstimate(activityId: number, remainingTextVolume: number): Promise<ActivityDetail> {
+    const csrfToken = await csrf()
+    return request<ActivityDetail>(`/v1/translator/activities/${activityId}/weekly-estimates/current`, {
+      method: 'PUT',
+      headers: { [csrfToken.headerName]: csrfToken.token },
+      body: JSON.stringify({ remainingTextVolume }),
+    })
+  },
+
   async createWorkRecord(activityId: number, payload: CreateWorkRecordPayload): Promise<ActivityDetail> {
     const csrfToken = await csrf()
     return request<ActivityDetail>(`/v1/translator/activities/${activityId}/work-records`, {

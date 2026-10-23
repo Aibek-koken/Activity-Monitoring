@@ -1,4 +1,4 @@
-# Current API Contract (Sprints 1–2)
+# Current API Contract (Sprints 1–2 and Sprint 3 estimate slice)
 
 Last updated: 2026-10-22
 
@@ -58,14 +58,17 @@ Every endpoint below requires the `TRANSLATOR` role and an assignment to the req
 | GET | `/translator/activities/{activityId}` | Return assigned activity detail, cumulative translated volume, and this translator's work records |
 | POST | `/translator/activities/{activityId}/work-records` | Create one daily record; return refreshed activity detail |
 | PUT | `/translator/activities/{activityId}/work-records/{recordId}` | Edit this translator's existing record volume/hours; return refreshed activity detail |
+| PUT | `/translator/activities/{activityId}/weekly-estimates/current` | Responsible translator creates/updates the current week's remaining-volume estimate; return refreshed detail |
 
-The list response is `{ "activities": [...] }`. Each summary contains `id`, `activityNumber`, `activityName`, `projectName`, `status`, `responsible`, `assignedDate`, and `progress`. Detail adds `createdDate` and `workRecords`. `progress` currently contains `totalTranslatedVolume`, `recordCount`, and nullable `lastRecordDate`; it is the signed-in translator's cumulative work, not the later estimated-total metric. Each work record contains `id`, `recordDate`, `translatedVolume`, and nullable `workHours`.
+The list response is `{ "activities": [...] }`. Each summary contains `id`, `activityNumber`, `activityName`, `projectName`, `status`, `responsible`, `assignedDate`, and `progress`. Detail adds `createdDate`, `workRecords`, `currentWeek`, nullable `currentWeekEstimate`, `weeklyEstimates` (newest first), and server-computed `permissions`. `currentWeek` contains `startDate` and `endDate`; each estimate contains `id`, `weekStartDate`, `remainingTextVolume`, and `updatedAt`. `permissions` contains `canEditWorkRecords`, `canEditWeeklyEstimate`, `canFinish`, and `canSubmitForChecking`. The last two permissions describe eligibility for planned actions; their endpoints do not exist yet. `progress` contains `totalTranslatedVolume`, `recordCount`, and nullable `lastRecordDate`; it is the signed-in translator's cumulative work. Each work record contains `id`, `recordDate`, `translatedVolume`, and nullable `workHours`.
 
 Create body: `{ "recordDate": "2026-10-22", "translatedVolume": 12.50, "workHours": 4.25 }`. Update body has `translatedVolume` and optional `workHours`; record date cannot be changed. Volume must be greater than zero and at most 1000 with up to two decimals; hours, if supplied, must be 0–24 with up to two decimals. Future record dates are rejected. A second record for the same translator/activity/date returns 409.
 
 The UI's assignment role/status/assigned-date filters are currently client-side filters over this authorized list. The detail history's date range is also client-side; neither changes API progress totals.
 
-Sprint 3 weekly-estimate, finish, and reminder routes are planned in `SPRINT_3_PLAN.md` and do not exist yet.
+Estimate body: `{ "remainingTextVolume": 120.50 }`. The server calculates the Monday week start in `Asia/Almaty`; the client cannot submit a date. The value must be non-negative and fit `NUMERIC(14,2)`. Repeated saves update the same activity/week row. Assistants receive 403, unassigned translators 404, and estimates are locked once the activity is no longer `ASSIGNED` or `IN_PROGRESS` (409). Daily work records are also locked in those states.
+
+Sprint 3 reminder, finish, and submit-for-checking routes are planned in `SPRINT_3_PLAN.md` and do not exist yet.
 
 ## Error shape
 

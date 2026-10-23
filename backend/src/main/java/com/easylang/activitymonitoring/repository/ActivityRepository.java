@@ -1,14 +1,20 @@
 package com.easylang.activitymonitoring.repository;
 
 import com.easylang.activitymonitoring.model.Activity;
+import jakarta.persistence.LockModeType;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 public interface ActivityRepository extends JpaRepository<Activity, Long> {
     Optional<Activity> findByActivityNumber(String activityNumber);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select activity from Activity activity where activity.id = :activityId")
+    Optional<Activity> findByIdForUpdate(@Param("activityId") Long activityId);
 
     @Query("""
             select distinct activity

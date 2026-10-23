@@ -67,6 +67,11 @@ export function TranslatorActivityDetailPage() {
   const [isHistoryOpen, setIsHistoryOpen] = useState(false)
   const [historyFrom, setHistoryFrom] = useState('')
   const [historyTo, setHistoryTo] = useState('')
+  const [estimateValue, setEstimateValue] = useState('')
+  const [estimateError, setEstimateError] = useState<string | null>(null)
+  const [estimateSuccess, setEstimateSuccess] = useState<string | null>(null)
+  const [isEstimateSaving, setIsEstimateSaving] = useState(false)
+  const [isEstimateHistoryOpen, setIsEstimateHistoryOpen] = useState(false)
   const todayLocal = todayLocalDateString()
   const latestAllowedDate = latestAllowedRecordDateString()
   const workRecords = useMemo(() => activity?.workRecords ?? [], [activity?.workRecords])
@@ -137,6 +142,10 @@ export function TranslatorActivityDetailPage() {
 
   useEffect(() => {
     if (!activity) return
+
+    setEstimateValue(activity.currentWeekEstimate == null
+      ? ''
+      : inputValue(toNumberOrNull(activity.currentWeekEstimate.remainingTextVolume) ?? 0))
 
     if (todayRecord) {
       fillFormFromRecord(todayRecord, false)
@@ -214,6 +223,35 @@ export function TranslatorActivityDetailPage() {
     }
   }
 
+  const handleEstimateSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    if (!activity || isEstimateSaving) return
+
+    const value = estimateValue.trim()
+    if (!/^\d{1,12}(?:\.\d{1,2})?$/.test(value)) {
+      setEstimateError('Enter a non-negative number with up to 2 decimal places.')
+      setEstimateSuccess(null)
+      return
+    }
+
+    setIsEstimateSaving(true)
+    setEstimateError(null)
+    setEstimateSuccess(null)
+    try {
+      setActivity(await translatorActivityApi.saveCurrentEstimate(activity.id, Number(value)))
+      setEstimateSuccess('Weekly estimate saved.')
+    } catch (saveError) {
+      setEstimateError(saveError instanceof ApiError
+        ? saveError.fieldErrors.remainingTextVolume ?? saveError.message
+        : 'Weekly estimate could not be saved. Try again.')
+      if (saveError instanceof ApiError && saveError.status === 409) {
+        await loadActivity()
+      }
+    } finally {
+      setIsEstimateSaving(false)
+    }
+  }
+
   return (
     <WorkspaceLayout
       navItems={[{
@@ -287,7 +325,87 @@ export function TranslatorActivityDetailPage() {
               </div>
             </dl>
 
-            <section className="work-record-panel" aria-labelledby="record-form-title">
+            <section className="work-record-panel estimate-panel" aria-labelledby="estimate-title">
+              <div className="section-heading">
+                <div>
+                  <h2 id="estimate-title">Weekly remaining</h2>
+                  <p>
+                    {activity.currentWeek
+                      ? `${formatDate(activity.currentWeek.startDate)} – ${formatDate(activity.currentWeek.endDate)}`
+                      : 'Current week'}
+                  </p>
+                </div>
+                {activity.currentWeekEstimate && (
+                  <strong className="estimate-panel__current">
+                    {formatVolume(activity.currentWeekEstimate.remainingTextVolume)} units remaining
+                  </strong>
+                )}
+              </div>
+
+              {activity.permissions?.canEditWeeklyEstimate ? (
+                <form className="estimate-form" noValidate onSubmit={(event) => void handleEstimateSubmit(event)}>
+                  <div className="field-group">
+                    <label htmlFor="remaining-volume">Remaining volume (units)</label>
+                    <input
+                      aria-describedby={estimateError ? 'estimate-error' : undefined}
+                      aria-invalid={estimateError ? 'true' : 'false'}
+                      disabled={isEstimateSaving}
+                      id="remaining-volume"
+                      inputMode="decimal"
+                      onChange={(event) => {
+                        setEstimateValue(event.target.value)
+                        setEstimateError(null)
+                        setEstimateSuccess(null)
+                      }}
+                      placeholder="0.00"
+                      type="text"
+                      value={estimateValue}
+                    />
+                  </div>
+                  <button className="button button--primary" disabled={isEstimateSaving} type="submit">
+                    <Save size={17} aria-hidden="true" />
+                    {isEstimateSaving ? 'Saving…' : 'Save estimate'}
+                  </button>
+                </form>
+              ) : (
+                <p className="estimate-panel__note">
+                  {activity.responsible
+                    ? 'The estimate is read-only in this activity status.'
+                    : 'Only the responsible translator can update this estimate.'}
+                </p>
+              )}
+              {estimateError && <p className="form-alert" id="estimate-error" role="alert">{estimateError}</p>}
+              {estimateSuccess && <p aria-live="polite" className="form-success" role="status">{estimateSuccess}</p>}
+
+              <div className="estimate-history">
+                <button
+                  aria-controls="estimate-history-content"
+                  aria-expanded={isEstimateHistoryOpen}
+                  className="button button--ghost button--compact"
+                  onClick={() => setIsEstimateHistoryOpen((open) => !open)}
+                  type="button"
+                >
+                  {isEstimateHistoryOpen ? 'Hide estimate history' : 'Show estimate history'}
+                  <ChevronDown aria-hidden="true" className={isEstimateHistoryOpen ? 'history-disclosure__chevron history-disclosure__chevron--open' : 'history-disclosure__chevron'} size={17} />
+                </button>
+                <div hidden={!isEstimateHistoryOpen} id="estimate-history-content">
+                  {(activity.weeklyEstimates ?? []).length === 0 ? (
+                    <p className="estimate-panel__note">No weekly estimates yet.</p>
+                  ) : (
+                    <ul className="estimate-history__list">
+                      {(activity.weeklyEstimates ?? []).map((estimate) => (
+                        <li key={estimate.id}>
+                          <span>Week of {formatDate(estimate.weekStartDate)}</span>
+                          <strong>{formatVolume(estimate.remainingTextVolume)} units</strong>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              </div>
+            </section>
+
+            {activity.permissions?.canEditWorkRecords && <section className="work-record-panel" aria-labelledby="record-form-title">
               <div className="section-heading">
                 <div>
                   <h2 id="record-form-title">{editingRecord ? 'Edit daily record' : 'Record translated volume'}</h2>
@@ -408,7 +526,7 @@ export function TranslatorActivityDetailPage() {
 
               {formError && <p className="form-alert" role="alert">{formError}</p>}
               {formSuccess && <p aria-live="polite" className="form-success" role="status">{formSuccess}</p>}
-            </section>
+            </section>}
 
             <section className="record-section" aria-labelledby="history-title">
               <div className="history-disclosure">
@@ -484,7 +602,7 @@ export function TranslatorActivityDetailPage() {
                               <td data-label="Volume">{formatVolume(record.translatedVolume)}</td>
                               <td data-label="Work time">{formatWorkHours(record.workHours)}</td>
                               <td>
-                                <button
+                                {activity.permissions?.canEditWorkRecords && <button
                                   className="button button--ghost button--compact"
                                   disabled={isSaving}
                                   type="button"
@@ -492,7 +610,7 @@ export function TranslatorActivityDetailPage() {
                                 >
                                   <Pencil size={16} aria-hidden="true" />
                                   Edit
-                                </button>
+                                </button>}
                               </td>
                             </tr>
                           ))}

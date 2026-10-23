@@ -34,6 +34,7 @@ vi.mock('../lib/api', () => ({
   translatorActivityApi: {
     createWorkRecord: vi.fn(),
     get: vi.fn(),
+    saveCurrentEstimate: vi.fn(),
     updateWorkRecord: vi.fn(),
   },
 }))
@@ -53,6 +54,14 @@ const baseActivity: ActivityDetail = {
   responsible: true,
   status: 'ASSIGNED',
   workRecords: [],
+  currentWeek: { startDate: '2026-10-19', endDate: '2026-10-25' },
+  weeklyEstimates: [],
+  permissions: {
+    canEditWorkRecords: true,
+    canEditWeeklyEstimate: true,
+    canFinish: false,
+    canSubmitForChecking: false,
+  },
 }
 
 /**
@@ -70,6 +79,9 @@ const activityWithOmittedWorkHours = {
   projectName: 'Retail Launch Localization',
   responsible: false,
   status: 'IN_PROGRESS',
+  currentWeek: baseActivity.currentWeek,
+  weeklyEstimates: [],
+  permissions: { ...baseActivity.permissions, canEditWeeklyEstimate: false },
   workRecords: [
     // work hours never entered -> key absent
     { id: 303, recordDate: '2026-09-30', translatedVolume: 5.75 },
@@ -91,6 +103,9 @@ const activityWithoutRecords = {
   projectName: 'Central Asia Legal Portal',
   responsible: true,
   status: 'ASSIGNED',
+  currentWeek: baseActivity.currentWeek,
+  weeklyEstimates: [],
+  permissions: baseActivity.permissions,
   workRecords: [],
 } as unknown as ActivityDetail
 
@@ -108,6 +123,7 @@ describe('TranslatorActivityDetailPage', () => {
   beforeEach(() => {
     vi.mocked(translatorActivityApi.get).mockReset()
     vi.mocked(translatorActivityApi.createWorkRecord).mockReset()
+    vi.mocked(translatorActivityApi.saveCurrentEstimate).mockReset()
     vi.mocked(translatorActivityApi.updateWorkRecord).mockReset()
   })
 
@@ -133,6 +149,50 @@ describe('TranslatorActivityDetailPage', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Show history' }))
     expect(await screen.findByRole('heading', { name: 'No daily records yet' })).toBeInTheDocument()
     expect(screen.getByText('Recorded translated volume will appear here.')).toBeInTheDocument()
+  })
+
+  it('validates and saves the current weekly estimate', async () => {
+    const user = userEvent.setup()
+    const saved: ActivityDetail = {
+      ...baseActivity,
+      currentWeekEstimate: { id: 1, weekStartDate: '2026-10-19', remainingTextVolume: 0, updatedAt: '2026-10-22T12:00:00Z' },
+      weeklyEstimates: [{ id: 1, weekStartDate: '2026-10-19', remainingTextVolume: 0, updatedAt: '2026-10-22T12:00:00Z' }],
+      permissions: { ...baseActivity.permissions, canFinish: true },
+    }
+    vi.mocked(translatorActivityApi.get).mockResolvedValue(baseActivity)
+    vi.mocked(translatorActivityApi.saveCurrentEstimate).mockResolvedValue(saved)
+
+    renderPage()
+    await screen.findByRole('heading', { name: 'Weekly remaining' })
+    await user.type(screen.getByLabelText('Remaining volume (units)'), '-1')
+    await user.click(screen.getByRole('button', { name: 'Save estimate' }))
+    expect(screen.getByRole('alert')).toHaveTextContent('Enter a non-negative number')
+    expect(translatorActivityApi.saveCurrentEstimate).not.toHaveBeenCalled()
+
+    await user.clear(screen.getByLabelText('Remaining volume (units)'))
+    await user.type(screen.getByLabelText('Remaining volume (units)'), '0')
+    await user.click(screen.getByRole('button', { name: 'Save estimate' }))
+    expect(translatorActivityApi.saveCurrentEstimate).toHaveBeenCalledWith(101, 0)
+    expect(await screen.findByText('0 units remaining')).toBeInTheDocument()
+    expect(screen.getByText('Week of Oct 19, 2026')).not.toBeVisible()
+    await user.click(screen.getByRole('button', { name: 'Show estimate history' }))
+    expect(screen.getByText('Week of Oct 19, 2026')).toBeInTheDocument()
+  })
+
+  it('shows estimates read-only to an assisting translator', async () => {
+    vi.mocked(translatorActivityApi.get).mockResolvedValue({
+      ...baseActivity,
+      responsible: false,
+      currentWeekEstimate: { id: 2, weekStartDate: '2026-10-19', remainingTextVolume: 120, updatedAt: '2026-10-22T12:00:00Z' },
+      weeklyEstimates: [{ id: 2, weekStartDate: '2026-10-19', remainingTextVolume: 120, updatedAt: '2026-10-22T12:00:00Z' }],
+      permissions: { ...baseActivity.permissions, canEditWeeklyEstimate: false },
+    })
+
+    renderPage()
+    await screen.findByRole('heading', { name: 'Weekly remaining' })
+    expect(screen.getByText('Only the responsible translator can update this estimate.')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Save estimate' })).not.toBeInTheDocument()
+    expect(screen.getByText('120 units remaining')).toBeInTheDocument()
   })
 
   it('shows an error state when the activity cannot load', async () => {

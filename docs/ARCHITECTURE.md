@@ -7,7 +7,7 @@ Last updated: 2026-10-22
 - `backend/` is a Spring Boot 3 API. Entry point: `ActivityMonitoringApplication`.
 - `frontend/` is a React + TypeScript Vite app. Entry points: `frontend/src/main.tsx` and `frontend/src/App.tsx`.
 - `compose.yaml` runs local PostgreSQL on host port `55432`.
-- `backend/src/main/resources/db/migration/` contains Flyway migrations: V1 creates users, V2 adds projects/activities/assignments/work records, and V3 renames the translated-volume column. Applied migrations are immutable.
+- `backend/src/main/resources/db/migration/` contains Flyway migrations: V1 creates users, V2 adds projects/activities/assignments/work records, V3 renames the translated-volume column, and V4 adds weekly estimates, project editor assignments, reviews, and notifications. Applied migrations are immutable.
 - `docs/` contains handoff, architecture, design, API, status, and run notes.
 
 ## Backend Structure
@@ -15,7 +15,7 @@ Last updated: 2026-10-22
 The backend is a layered modular monolith:
 
 - `controller` exposes auth/workspace checks and translator activity/work-record endpoints.
-- `service` handles auth and translator activity use cases, including assignment checks, record validation, and progress responses.
+- `service` handles auth and translator activity use cases, including assignment checks, record validation, progress responses, and the Sprint 3 weekly-estimate upsert.
 - `repository` owns JPA access to users, projects, activities, assignments, and work records.
 - `model` contains users/roles and the Sprint 2 activity domain.
 - `dto` contains request/response records.
@@ -54,6 +54,6 @@ There is no self-registration flow in the current application.
 3. `POST`/`PUT` work-record endpoints validate the signed-in translator's assignment and data. The database enforces one record per translator/activity/date; creating the first record moves `ASSIGNED` to `IN_PROGRESS`.
 4. The history date range only changes which records the page displays. It does not change the server's cumulative total or the record form.
 
-## Sprint 3 Extension Point
+## Sprint 3 In Progress
 
-The next slice adds weekly estimates, the responsible translator's zero-remaining `FINISHED` transition, and reminders. Introduce them in the existing controller → service → repository layers, with a new Flyway migration and server-owned rules. `FINISHED` precedes editor checking; `COMPLETED` requires the later approval flow. See `SPRINT_3_PLAN.md` for scope and unresolved policy choices.
+V4 and the weekly-estimate slice are implemented. `TranslatorProgressService` locks the activity row, verifies the responsible assignment, and creates or updates the server-calculated current-week estimate. `TranslatorActivityService` includes estimate history and permissions in detail responses; record writes use the same row lock and reject states after `IN_PROGRESS`. `BusinessTimeConfig` supplies a configurable `Clock` defaulting to `Asia/Almaty`. The UI shows the estimate and collapsed history on the existing detail page. Review and notification tables are present, but finish, submission, reminder scheduling, and reminder APIs remain to be implemented. See `SPRINT_3_PLAN.md` for the remaining stages.
