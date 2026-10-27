@@ -1,9 +1,9 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
-import { AlertCircle, ChevronDown, ClipboardList, Pencil, Plus, RefreshCw, Save } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
+import { AlertCircle, ChevronDown, ClipboardList, FolderOpen, Languages, Pencil, Plus, RefreshCw, Save } from 'lucide-react'
 import { useLocation, useParams } from 'react-router-dom'
 import { Breadcrumbs } from '../components/Breadcrumbs'
 import { WorkspaceLayout } from '../components/WorkspaceLayout'
-import { activityStatusLabels, formatDate, formatVolume, formatWorkHours, statusClassName, toNumberOrNull } from '../lib/activity-format'
+import { activityStatusLabels, formatDate, formatDateTimeInAlmaty, formatVolume, formatWeekRange, formatWorkHours, statusClassName, toNumberOrNull } from '../lib/activity-format'
 import { ApiError, translatorActivityApi } from '../lib/api'
 import { latestAllowedRecordDateString, todayLocalDateString } from '../lib/date'
 import { validateRecordDate, validateTranslatedVolume, validateWorkTime } from '../lib/validation'
@@ -72,8 +72,6 @@ export function TranslatorActivityDetailPage() {
   const [estimateSuccess, setEstimateSuccess] = useState<string | null>(null)
   const [isEstimateSaving, setIsEstimateSaving] = useState(false)
   const [isEstimateOpen, setIsEstimateOpen] = useState(location.hash === '#weekly-estimate')
-  const estimateInputRef = useRef<HTMLInputElement>(null)
-  const focusEstimateOnOpenRef = useRef(false)
   const [isEstimateHistoryOpen, setIsEstimateHistoryOpen] = useState(false)
   const [isFinishConfirming, setIsFinishConfirming] = useState(false)
   const [isLifecycleSaving, setIsLifecycleSaving] = useState(false)
@@ -95,6 +93,9 @@ export function TranslatorActivityDetailPage() {
     () => workRecords.find((record) => recordMatches(record, editingRecordId)) ?? null,
     [editingRecordId, workRecords],
   )
+  const isEstimateHistoryOnly = activity != null
+    && activity.status !== 'ASSIGNED'
+    && activity.status !== 'IN_PROGRESS'
 
   const fillFormFromRecord = (record: WorkRecord, clearMessages = true) => {
     setEditingRecordId(record.id)
@@ -177,22 +178,6 @@ export function TranslatorActivityDetailPage() {
     setFieldErrors({})
     setFormError(null)
   }, [activity, todayRecord, todayLocal])
-
-  useEffect(() => {
-    if (isEstimateOpen && focusEstimateOnOpenRef.current) {
-      estimateInputRef.current?.focus()
-      focusEstimateOnOpenRef.current = false
-    }
-  }, [isEstimateOpen])
-
-  const openEstimateForFinish = () => {
-    if (isEstimateOpen) {
-      estimateInputRef.current?.focus()
-      return
-    }
-    focusEstimateOnOpenRef.current = true
-    setIsEstimateOpen(true)
-  }
 
   const clearFieldError = (field: keyof RecordFieldErrors) => {
     setFieldErrors((current) => {
@@ -320,7 +305,7 @@ export function TranslatorActivityDetailPage() {
       role="TRANSLATOR"
       title="Activity details"
     >
-      <div className="workspace-content translator-workspace">
+      <div className="workspace-content translator-workspace translator-workspace--detail">
         <Breadcrumbs items={[
           { label: 'Activities', to: `/translator${location.search}` },
           { label: activity?.activityNumber ?? 'Activity' },
@@ -350,158 +335,149 @@ export function TranslatorActivityDetailPage() {
 
         {!isLoading && activity && (
           <>
-            <header className="activity-detail">
-              <div>
-                <div className="activity-detail__context">
-                  <span>{activity.activityNumber}</span>
-                  <span className={statusClassName(activity.status)}>{activityStatusLabels[activity.status]}</span>
-                  <span>{activity.responsible ? 'Responsible' : 'Assisting'}</span>
+            <div className="activity-workspace-card">
+              <header className="activity-detail">
+                <div className="activity-detail__identity">
+                  <span className="activity-detail__mark" aria-hidden="true"><Languages size={24} /></span>
+                  <div className="activity-detail__copy">
+                    <div className="activity-detail__context">
+                      <span>{activity.activityNumber}</span>
+                      <span className={statusClassName(activity.status)}>{activityStatusLabels[activity.status]}</span>
+                      <span className="assignment-pill">{activity.responsible ? 'Responsible' : 'Assisting'}</span>
+                    </div>
+                    <h1>{activity.activityName}</h1>
+                    <p className="activity-detail__project"><FolderOpen aria-hidden="true" size={16} />{activity.projectName}</p>
+                  </div>
                 </div>
-                <h1>{activity.activityName}</h1>
-                <p>{activity.projectName}</p>
-              </div>
-            </header>
-
-            <p className="activity-detail__summary">
-              <span><strong>{formatVolume(activity.progress.totalTranslatedVolume)} units</strong> logged by you</span>
-              <span>{activity.progress.recordCount} daily {activity.progress.recordCount === 1 ? 'record' : 'records'}</span>
-              {activity.progress.lastRecordDate && <span>Last entry {formatDate(activity.progress.lastRecordDate)}</span>}
-            </p>
-
-            {activity.permissions?.canEditWorkRecords && <section className="work-record-panel" aria-labelledby="record-form-title">
-              <div className="section-heading">
-                <div>
-                  <h2 id="record-form-title">{editingRecord ? 'Edit daily record' : 'Record daily work'}</h2>
-                  <p>
-                    {editingRecord
-                      ? `You are editing ${formatDate(editingRecord.recordDate)}. The date stays locked; change the volume or hours only.`
-                      : 'Log the units you translated on this date. You can choose a past date.'}
-                  </p>
+                <div className="activity-detail__volume">
+                  <span>Logged by you</span>
+                  <strong>{formatVolume(activity.progress.totalTranslatedVolume)} units</strong>
                 </div>
-                {editingRecord && (
-                  <button className="button button--secondary" disabled={isSaving} type="button" onClick={startNewRecord}>
-                    <Plus size={17} aria-hidden="true" />
-                    New date
-                  </button>
-                )}
-              </div>
+              </header>
 
-              <form className="work-record-form" noValidate onSubmit={(event) => void handleRecordSubmit(event)}>
-                <div className="field-group">
-                  <label htmlFor="record-date">Record date</label>
-                  {editingRecord ? (
+              {activity.permissions?.canEditWorkRecords && <section className="work-record-panel" aria-labelledby="record-form-title">
+                <div className="section-heading">
+                  <div>
+                    <h2 id="record-form-title">{editingRecord ? 'Edit daily record' : 'Record daily work'}</h2>
+                    <p>
+                      {editingRecord
+                        ? `You are editing ${formatDate(editingRecord.recordDate)}. The date stays locked; change the volume or hours only.`
+                        : 'Log the units you translated on this date. You can choose a past date.'}
+                    </p>
+                  </div>
+                  {editingRecord && (
+                    <button className="button button--secondary" disabled={isSaving} type="button" onClick={startNewRecord}>
+                      <Plus size={17} aria-hidden="true" />
+                      New date
+                    </button>
+                  )}
+                </div>
+
+                <form className="work-record-form" noValidate onSubmit={(event) => void handleRecordSubmit(event)}>
+                  <div className="field-group">
+                    <label htmlFor="record-date">Record date</label>
+                    {editingRecord ? (
+                      <input
+                        className="readonly-field"
+                        id="record-date"
+                        readOnly
+                        type="text"
+                        value={formatDate(recordDate)}
+                      />
+                    ) : (
+                      <input
+                        aria-describedby={fieldErrors.recordDate ? 'record-date-error' : undefined}
+                        aria-invalid={fieldErrors.recordDate ? 'true' : 'false'}
+                        disabled={isSaving}
+                        id="record-date"
+                        max={latestAllowedDate}
+                        onChange={(event) => {
+                          const nextDate = event.target.value
+                          const existingRecord = workRecords.find((record) => record.recordDate === nextDate)
+                          if (existingRecord) {
+                            fillFormFromRecord(existingRecord)
+                          } else {
+                            setRecordDate(nextDate)
+                            setEditingRecordId(null)
+                            clearFieldError('recordDate')
+                          }
+                        }}
+                        type="date"
+                        value={recordDate}
+                      />
+                    )}
+                    {fieldErrors.recordDate && <p className="field-error" id="record-date-error">{fieldErrors.recordDate}</p>}
+                  </div>
+
+                  <div className="field-group">
+                    <label htmlFor="translated-volume">Translated volume (units)</label>
                     <input
-                      className="readonly-field"
-                      id="record-date"
-                      readOnly
-                      type="text"
-                      value={formatDate(recordDate)}
-                    />
-                  ) : (
-                    <input
-                      aria-describedby={fieldErrors.recordDate ? 'record-date-error' : undefined}
-                      aria-invalid={fieldErrors.recordDate ? 'true' : 'false'}
+                      aria-describedby={fieldErrors.translatedVolume ? 'translated-volume-error' : undefined}
+                      aria-invalid={fieldErrors.translatedVolume ? 'true' : 'false'}
                       disabled={isSaving}
-                      id="record-date"
-                      max={latestAllowedDate}
+                      id="translated-volume"
+                      inputMode="decimal"
                       onChange={(event) => {
-                        const nextDate = event.target.value
-                        const existingRecord = workRecords.find((record) => record.recordDate === nextDate)
-                        if (existingRecord) {
-                          fillFormFromRecord(existingRecord)
-                        } else {
-                          setRecordDate(nextDate)
-                          setEditingRecordId(null)
-                          clearFieldError('recordDate')
-                        }
+                        setTranslatedVolume(event.target.value)
+                        clearFieldError('translatedVolume')
                       }}
-                      type="date"
-                      value={recordDate}
+                      placeholder="0.00"
+                      type="text"
+                      value={translatedVolume}
                     />
-                  )}
-                  {fieldErrors.recordDate && <p className="field-error" id="record-date-error">{fieldErrors.recordDate}</p>}
-                </div>
+                    {fieldErrors.translatedVolume && (
+                      <p className="field-error" id="translated-volume-error">{fieldErrors.translatedVolume}</p>
+                    )}
+                  </div>
 
-                <div className="field-group">
-                  <label htmlFor="translated-volume">Translated volume (units)</label>
-                  <input
-                    aria-describedby={fieldErrors.translatedVolume ? 'translated-volume-error' : undefined}
-                    aria-invalid={fieldErrors.translatedVolume ? 'true' : 'false'}
-                    disabled={isSaving}
-                    id="translated-volume"
-                    inputMode="decimal"
-                    onChange={(event) => {
-                      setTranslatedVolume(event.target.value)
-                      clearFieldError('translatedVolume')
-                    }}
-                    placeholder="0.00"
-                    type="text"
-                    value={translatedVolume}
-                  />
-                  {fieldErrors.translatedVolume && (
-                    <p className="field-error" id="translated-volume-error">{fieldErrors.translatedVolume}</p>
-                  )}
-                </div>
+                  <div className="field-group">
+                    <label htmlFor="work-hours">Hours (optional)</label>
+                    <input
+                      aria-describedby={fieldErrors.workHours ? 'work-hours-error' : undefined}
+                      aria-invalid={fieldErrors.workHours ? 'true' : 'false'}
+                      disabled={isSaving}
+                      id="work-hours"
+                      inputMode="numeric"
+                      onChange={(event) => {
+                        setWorkHours(event.target.value)
+                        clearFieldError('workHours')
+                      }}
+                      placeholder="0"
+                      type="text"
+                      value={workHours}
+                    />
+                    {fieldErrors.workHours && <p className="field-error" id="work-hours-error">{fieldErrors.workHours}</p>}
+                  </div>
 
-                <div className="field-group">
-                  <label htmlFor="work-hours">Hours (optional)</label>
-                  <input
-                    aria-describedby={fieldErrors.workHours ? 'work-hours-error' : undefined}
-                    aria-invalid={fieldErrors.workHours ? 'true' : 'false'}
-                    disabled={isSaving}
-                    id="work-hours"
-                    inputMode="numeric"
-                    onChange={(event) => {
-                      setWorkHours(event.target.value)
-                      clearFieldError('workHours')
-                    }}
-                    placeholder="0"
-                    type="text"
-                    value={workHours}
-                  />
-                  {fieldErrors.workHours && <p className="field-error" id="work-hours-error">{fieldErrors.workHours}</p>}
-                </div>
+                  <div className="field-group">
+                    <label htmlFor="work-minutes">Minutes</label>
+                    <input
+                      aria-describedby={fieldErrors.workMinutes ? 'work-minutes-error' : undefined}
+                      aria-invalid={fieldErrors.workMinutes ? 'true' : 'false'}
+                      disabled={isSaving}
+                      id="work-minutes"
+                      inputMode="numeric"
+                      onChange={(event) => {
+                        setWorkMinutes(event.target.value)
+                        clearFieldError('workMinutes')
+                      }}
+                      placeholder="0"
+                      type="text"
+                      value={workMinutes}
+                    />
+                    {fieldErrors.workMinutes && <p className="field-error" id="work-minutes-error">{fieldErrors.workMinutes}</p>}
+                  </div>
 
-                <div className="field-group">
-                  <label htmlFor="work-minutes">Minutes</label>
-                  <input
-                    aria-describedby={fieldErrors.workMinutes ? 'work-minutes-error' : undefined}
-                    aria-invalid={fieldErrors.workMinutes ? 'true' : 'false'}
-                    disabled={isSaving}
-                    id="work-minutes"
-                    inputMode="numeric"
-                    onChange={(event) => {
-                      setWorkMinutes(event.target.value)
-                      clearFieldError('workMinutes')
-                    }}
-                    placeholder="0"
-                    type="text"
-                    value={workMinutes}
-                  />
-                  {fieldErrors.workMinutes && <p className="field-error" id="work-minutes-error">{fieldErrors.workMinutes}</p>}
-                </div>
+                  <button aria-busy={isSaving} className="button button--primary" disabled={isSaving} type="submit">
+                    <Save size={17} aria-hidden="true" />
+                    {isSaving ? 'Saving…' : editingRecord ? 'Update record' : 'Save record'}
+                  </button>
+                </form>
 
-                <button aria-busy={isSaving} className="button button--primary" disabled={isSaving} type="submit">
-                  <Save size={17} aria-hidden="true" />
-                  {isSaving ? 'Saving…' : editingRecord ? 'Update record' : 'Save record'}
-                </button>
-              </form>
-
-              {formError && <p className="form-alert" role="alert">{formError}</p>}
-              {formSuccess && <p aria-live="polite" className="form-success" role="status">{formSuccess}</p>}
-            </section>}
-
-            {activity.permissions?.canEditWeeklyEstimate && !activity.permissions.canFinish && (
-              <section className="next-step-panel" aria-labelledby="finish-guide-title">
-                <div>
-                  <h2 id="finish-guide-title">When the translation is done</h2>
-                  <p>Daily records track work already done. When no text remains, report 0 units remaining, then finish the activity.</p>
-                </div>
-                <button className="button button--secondary button--compact" onClick={openEstimateForFinish} type="button">
-                  Update remaining estimate
-                </button>
-              </section>
-            )}
+                {formError && <p className="form-alert" role="alert">{formError}</p>}
+                {formSuccess && <p aria-live="polite" className="form-success" role="status">{formSuccess}</p>}
+              </section>}
+            </div>
 
             {activity.permissions?.canFinish && (
               <section className="next-step-panel next-step-panel--ready lifecycle-panel" aria-labelledby="finish-title">
@@ -532,15 +508,22 @@ export function TranslatorActivityDetailPage() {
               </section>
             )}
 
-            {activity.permissions?.canSubmitForChecking && (
-              <section className="next-step-panel next-step-panel--ready lifecycle-panel" aria-labelledby="submit-title">
+            {activity.status === 'FINISHED' && activity.responsible && (
+              <section className={`next-step-panel lifecycle-panel${activity.permissions?.canSubmitForChecking ? ' next-step-panel--ready' : ' next-step-panel--blocked'}`} aria-labelledby="submit-title">
                 <div className="section-heading">
                   <div>
-                    <h2 id="submit-title">Ready for checking</h2>
-                    <p>Records are locked. Send this activity to the responsible Chief Editor.</p>
+                    <h2 id="submit-title">{activity.permissions?.canSubmitForChecking ? 'Ready for checking' : 'Waiting for Chief Editor assignment'}</h2>
+                    <p>{activity.permissions?.canSubmitForChecking
+                      ? 'Records are locked. Send this activity to the responsible Chief Editor.'
+                      : 'A Project Manager must assign a responsible Chief Editor before this activity can be submitted.'}</p>
                   </div>
-                  <button className="button button--primary" disabled={isLifecycleSaving} onClick={() => void handleLifecycleAction('submit')} type="button">
-                    {isLifecycleSaving ? 'Submitting…' : 'Submit for checking'}
+                  <button
+                    className={activity.permissions?.canSubmitForChecking ? 'button button--primary' : 'button button--secondary'}
+                    disabled={!activity.permissions?.canSubmitForChecking || isLifecycleSaving}
+                    onClick={() => void handleLifecycleAction('submit')}
+                    type="button"
+                  >
+                    {isLifecycleSaving ? 'Submitting…' : activity.permissions?.canSubmitForChecking ? 'Submit for checking' : 'Submit unavailable'}
                   </button>
                 </div>
               </section>
@@ -560,6 +543,41 @@ export function TranslatorActivityDetailPage() {
             {lifecycleError && <p className="form-alert" role="alert">{lifecycleError}</p>}
             {lifecycleSuccess && <p aria-live="polite" className="form-success" role="status">{lifecycleSuccess}</p>}
 
+            {isEstimateHistoryOnly ? (
+              <section className="record-section estimate-history-section" aria-labelledby="estimate-history-title" id="weekly-estimate">
+                <div className="history-disclosure">
+                  <div>
+                    <h2 id="estimate-history-title">Weekly estimate history</h2>
+                    <p>{(activity.weeklyEstimates ?? []).length} {(activity.weeklyEstimates ?? []).length === 1 ? 'record' : 'records'}</p>
+                  </div>
+                  <button
+                    aria-controls="finished-estimate-history-content"
+                    aria-expanded={isEstimateHistoryOpen}
+                    aria-label={isEstimateHistoryOpen ? 'Hide weekly estimate history' : 'Show weekly estimate history'}
+                    className="button button--secondary history-disclosure__toggle"
+                    onClick={() => setIsEstimateHistoryOpen((open) => !open)}
+                    type="button"
+                  >
+                    {isEstimateHistoryOpen ? 'Hide history' : 'Show history'}
+                    <ChevronDown aria-hidden="true" className={isEstimateHistoryOpen ? 'history-disclosure__chevron history-disclosure__chevron--open' : 'history-disclosure__chevron'} size={17} />
+                  </button>
+                </div>
+                <div className="history-content" hidden={!isEstimateHistoryOpen} id="finished-estimate-history-content">
+                  {(activity.weeklyEstimates ?? []).length === 0 ? (
+                    <p className="estimate-panel__note">No weekly estimates were recorded.</p>
+                  ) : (
+                    <ul className="estimate-history__list">
+                      {(activity.weeklyEstimates ?? []).map((estimate) => (
+                        <li key={estimate.id}>
+                          <span>{formatWeekRange(estimate.weekStartDate)} · Updated {formatDateTimeInAlmaty(estimate.updatedAt)}</span>
+                          <strong>{formatVolume(estimate.remainingTextVolume)} units</strong>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              </section>
+            ) : (
             <section className="estimate-disclosure" aria-labelledby="estimate-title" id="weekly-estimate">
               <button
                 aria-controls="estimate-content"
@@ -568,7 +586,7 @@ export function TranslatorActivityDetailPage() {
                 onClick={() => setIsEstimateOpen((open) => !open)}
                 type="button"
               >
-                <span>
+                <span className="estimate-disclosure__intro">
                   <span className="estimate-disclosure__title" id="estimate-title">Weekly remaining estimate</span>
                   <span className="estimate-disclosure__caption">{activity.currentWeek
                     ? `${formatDate(activity.currentWeek.startDate)} – ${formatDate(activity.currentWeek.endDate)}`
@@ -583,9 +601,7 @@ export function TranslatorActivityDetailPage() {
               </button>
               <div className="estimate-disclosure__content" hidden={!isEstimateOpen} id="estimate-content">
                 {activity.permissions?.canEditWeeklyEstimate ? (
-                  <>
-                    <p className="estimate-panel__note">Estimate the text still left in this activity. This is separate from your daily work record.</p>
-                    <form className="estimate-form" noValidate onSubmit={(event) => void handleEstimateSubmit(event)}>
+                  <form className="estimate-form" noValidate onSubmit={(event) => void handleEstimateSubmit(event)}>
                       <div className="field-group">
                         <label htmlFor="remaining-volume">Remaining volume (units)</label>
                         <input
@@ -594,7 +610,6 @@ export function TranslatorActivityDetailPage() {
                           disabled={isEstimateSaving}
                           id="remaining-volume"
                           inputMode="decimal"
-                          ref={estimateInputRef}
                           onChange={(event) => {
                             setEstimateValue(event.target.value)
                             setEstimateError(null)
@@ -609,8 +624,7 @@ export function TranslatorActivityDetailPage() {
                         <Save size={17} aria-hidden="true" />
                         {isEstimateSaving ? 'Saving…' : 'Save estimate'}
                       </button>
-                    </form>
-                  </>
+                  </form>
                 ) : (
                   <p className="estimate-panel__note">{activity.responsible
                     ? 'This estimate is read-only after finishing.'
@@ -636,7 +650,7 @@ export function TranslatorActivityDetailPage() {
                       <ul className="estimate-history__list">
                         {(activity.weeklyEstimates ?? []).map((estimate) => (
                           <li key={estimate.id}>
-                            <span>Week of {formatDate(estimate.weekStartDate)}</span>
+                            <span>{formatWeekRange(estimate.weekStartDate)} · Updated {formatDateTimeInAlmaty(estimate.updatedAt)}</span>
                             <strong>{formatVolume(estimate.remainingTextVolume)} units</strong>
                           </li>
                         ))}
@@ -646,6 +660,7 @@ export function TranslatorActivityDetailPage() {
                 </div>
               </div>
             </section>
+            )}
 
             <section className="record-section" aria-labelledby="history-title">
               <div className="history-disclosure">

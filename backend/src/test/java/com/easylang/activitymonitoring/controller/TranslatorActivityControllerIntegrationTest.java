@@ -315,6 +315,11 @@ class TranslatorActivityControllerIntegrationTest {
 
         editorRepository.delete(editorRepository.findByProjectIdAndResponsibleTrue(activity.getProject().getId()).orElseThrow());
         editorRepository.flush();
+        mockMvc.perform(get("/api/v1/translator/activities/{activityId}", activity.getId())
+                        .cookie(accessCookie))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.permissions.canSubmitForChecking").value(false))
+                .andExpect(jsonPath("$.permissions.hasResponsibleChiefEditor").value(false));
         mockMvc.perform(post("/api/v1/translator/activities/{activityId}/submit-for-checking", activity.getId())
                         .cookie(accessCookie, csrf.cookie()).header(csrf.headerName(), csrf.token()))
                 .andExpect(status().isConflict())

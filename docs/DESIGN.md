@@ -1,6 +1,6 @@
 # Design
 
-Last updated: 2026-10-25
+Last updated: 2026-10-28
 
 ## Translation workflow references
 
@@ -35,8 +35,9 @@ Landing-only tokens live in `frontend/src/landing.css`: dark slate hero (`--land
 - `LoginPage` uses an auth card, field groups, password visibility button, alert, primary submit, back-to-landing button, and quick-access role buttons.
 - `LandingPage` uses a full-viewport dark hero, monitoring preview, capability blocks, activity flow, role cards, final CTA, and footer.
 - `WorkspacePage` uses a protected starter workspace shell with role-specific labels and logout.
-- `TranslatorActivitiesPage` uses a breadcrumb, a restrained page title, search, and a compact All / Responsible / Assisting assignment filter. A filter button opens status and assigned-date controls; there is no top summary-card row. A small reminder region appears above the filters only when relevant reminders or a reminder loading error exist.
-- `TranslatorActivityDetailPage` uses a breadcrumb and compact activity context. The daily record form is first. A single next-step panel explains the path to Finish or Submit for the responsible translator; the weekly remaining estimate and both histories start collapsed. Daily history date filtering does not change the record form or lifetime personal volume.
+- `TranslatorActivitiesPage` uses a breadcrumb, a restrained page title, search, and a compact All / Responsible / Assisting assignment filter. These quick assignment views omit `FINISHED` activities; selecting `Finished` in the status popover reveals them. A filter button opens status and assigned-date controls; there is no top summary-card row.
+- `TranslatorNotificationCenter` keeps reminders in a persistent circular bell at the right side of the workspace top bar on both translator pages. Its badge shows the unread count, and the top bar owns the popover's stacking layer so page controls cannot cover it. The popover distinguishes daily-record reminders with teal and a record icon, and weekly-estimate reminders with blue and a calendar icon; labels repeat the distinction without relying on color. Each item has an explicit action label, opens its target, and becomes read when opened; the header also supports marking all visible reminders read.
+- `TranslatorActivityDetailPage` uses a wider working canvas. The activity banner and editable daily-record form share one bordered work surface because they are the page's primary context and action. Weekly estimate and history are quieter full-width rows separated by horizontal rules rather than repeated white cards. Daily-record count and last-entry metadata stay in history rather than being repeated below the banner. Weekly completion guidance lives inside the weekly remaining estimate disclosure instead of a separate card and duplicate action. Finish and Submit keep bordered next-step panels because they represent consequential state changes; both histories start collapsed. Daily history date filtering does not change the record form or lifetime personal volume.
 - `FullPageStatus` and `NotFoundPage` provide status/error states.
 
 ## UX Rules Already Used
@@ -56,6 +57,8 @@ Landing-only tokens live in `frontend/src/landing.css`: dark slate hero (`--land
 
 ## Sprint 3 UI
 
-The current translator UI applies the Lokalise task-first reference. The activity title, status, assignment role, and *personal* recorded volume are compact context. Logging a daily record is the primary active-state task. A short next-step panel explains that a responsible translator finishes by saving 0 remaining for the current week and confirming Finish; recording an arbitrarily large daily volume does not finish the activity. The weekly estimate is a secondary disclosure after the daily form, and is read-only for assistants. At 0 remaining, Finish is visible without opening that disclosure. Submit appears only in `FINISHED`; after submission, work forms disappear and the status is clear.
+The current translator UI applies the task-first hierarchy seen in Lokalise, Smartcat, and Phrase: activity identity and current state come first, while histories stay secondary. Logging a daily record is the primary active-state task. The weekly estimate disclosure keeps its header compact; the field label and save action communicate what to enter without a repeated explanatory paragraph. Saving 0 enables the separate Finish action. The estimate remains read-only for assistants. At 0 remaining, Finish is visible without opening that disclosure. Once the activity leaves `ASSIGNED`/`IN_PROGRESS`, the current-week control is replaced by collapsible weekly estimate history, avoiding a misleading new-week `No estimate yet` state. In `FINISHED`, Submit is green and actionable only when the project has a responsible Chief Editor; otherwise a neutral disabled panel explains the missing assignment. After submission, work forms disappear and the status is clear.
 
-The activity list keeps search and assignment filtering visible. Relevant reminders are summarized in one disclosure and expand to direct links and read actions; a weekly reminder opens the estimate on its target activity. The activity rows label volume as recorded by the signed-in translator. Histories remain available on demand. Responsive stacking, keyboard focus, and server-owned lifecycle permissions use the existing system.
+The activity list keeps search and assignment filtering visible. Reminders live in the persistent top-right notification control instead of occupying list content; a daily reminder opens the activity list and a weekly reminder opens the estimate on its target activity. The activity rows label volume as recorded by the signed-in translator. Histories remain available on demand. Responsive stacking, keyboard focus, and server-owned lifecycle permissions use the existing system.
+
+Weekly estimate history uses one compact line: a Monday-to-Sunday range followed by the last update date and time. The instant is still converted to `Asia/Almaty`, but the redundant timezone label and repeated year are omitted from the visible copy.

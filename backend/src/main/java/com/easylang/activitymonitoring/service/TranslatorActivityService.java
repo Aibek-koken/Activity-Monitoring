@@ -17,6 +17,7 @@ import com.easylang.activitymonitoring.model.WorkRecord;
 import com.easylang.activitymonitoring.model.WeeklyEstimate;
 import com.easylang.activitymonitoring.repository.ActivityRepository;
 import com.easylang.activitymonitoring.repository.ActivityTranslatorRepository;
+import com.easylang.activitymonitoring.repository.ProjectChiefEditorRepository;
 import com.easylang.activitymonitoring.repository.WorkRecordRepository;
 import com.easylang.activitymonitoring.repository.WeeklyEstimateRepository;
 import java.math.BigDecimal;
@@ -39,6 +40,7 @@ public class TranslatorActivityService {
     private final ActivityTranslatorRepository activityTranslatorRepository;
     private final WorkRecordRepository workRecordRepository;
     private final WeeklyEstimateRepository weeklyEstimateRepository;
+    private final ProjectChiefEditorRepository projectChiefEditorRepository;
     private final Clock businessClock;
 
     public TranslatorActivityService(
@@ -46,12 +48,14 @@ public class TranslatorActivityService {
             ActivityTranslatorRepository activityTranslatorRepository,
             WorkRecordRepository workRecordRepository,
             WeeklyEstimateRepository weeklyEstimateRepository,
+            ProjectChiefEditorRepository projectChiefEditorRepository,
             Clock businessClock
     ) {
         this.activityRepository = activityRepository;
         this.activityTranslatorRepository = activityTranslatorRepository;
         this.workRecordRepository = workRecordRepository;
         this.weeklyEstimateRepository = weeklyEstimateRepository;
+        this.projectChiefEditorRepository = projectChiefEditorRepository;
         this.businessClock = businessClock;
     }
 
@@ -151,6 +155,9 @@ public class TranslatorActivityService {
                 .orElse(null);
         boolean active = activity.getStatus() == ActivityStatus.ASSIGNED
                 || activity.getStatus() == ActivityStatus.IN_PROGRESS;
+        boolean hasResponsibleChiefEditor = projectChiefEditorRepository
+                .findByProjectIdAndResponsibleTrue(activity.getProject().getId())
+                .isPresent();
         List<WorkRecordResponse> workRecords = workRecordRepository
                 .findByActivityIdAndTranslatorIdOrderByRecordDateDescIdDesc(activity.getId(), translatorId)
                 .stream()
@@ -177,6 +184,8 @@ public class TranslatorActivityService {
                         active && assignment.isResponsible() && currentEstimate != null
                                 && currentEstimate.remainingTextVolume().signum() == 0,
                         activity.getStatus() == ActivityStatus.FINISHED && assignment.isResponsible()
+                                && hasResponsibleChiefEditor,
+                        hasResponsibleChiefEditor
                 )
         );
     }

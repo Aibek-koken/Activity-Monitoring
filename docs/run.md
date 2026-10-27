@@ -30,6 +30,16 @@ npm run dev
 
 Open `http://localhost:5173`.
 
+### Maya showcase data
+
+After the backend starts, `translator@easylang.local` receives idempotent non-production showcase data:
+
+- `EL-2026-001`: weekly remaining history for the current week and the two previous weeks (`120`, `260`, and `410` units);
+- one current daily-record reminder;
+- one current weekly-estimate reminder for `EL-2026-002`, where the estimate is intentionally still missing.
+
+Restarting the backend applies missing showcase rows without duplicating existing ones. Production and automated test profiles do not receive this showcase data.
+
 ## Database inspection
 
 Postgres:

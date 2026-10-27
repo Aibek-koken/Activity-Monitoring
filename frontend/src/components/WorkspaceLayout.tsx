@@ -5,6 +5,7 @@ import { useAuth } from '../auth/AuthContext'
 import { roleLabels } from '../lib/roles'
 import type { Role } from '../types/auth'
 import { BrandMark } from './BrandMark'
+import { TranslatorNotificationCenter } from './TranslatorNotificationCenter'
 
 interface WorkspaceNavItem {
   to: string
@@ -38,7 +39,9 @@ export function WorkspaceLayout({ role, title, navItems, children }: WorkspaceLa
   return (
     <div className="workspace-shell">
       <aside className="workspace-sidebar">
-        <BrandMark compact />
+        <div className="workspace-sidebar__header">
+          <BrandMark compact />
+        </div>
         <div className="workspace-sidebar__role">
           <span>Workspace</span>
           <strong>{roleLabels[role]}</strong>
@@ -80,7 +83,10 @@ export function WorkspaceLayout({ role, title, navItems, children }: WorkspaceLa
       <main className="workspace-main">
         <header className="workspace-topbar">
           <strong>{title}</strong>
-          <span>{roleLabels[role]}</span>
+          <div className="workspace-topbar__actions">
+            <span>{roleLabels[role]}</span>
+            {role === 'TRANSLATOR' && <TranslatorNotificationCenter />}
+          </div>
         </header>
         {children}
       </main>

@@ -62,7 +62,8 @@ public final class TranslatorActivityDtos {
             boolean canEditWorkRecords,
             boolean canEditWeeklyEstimate,
             boolean canFinish,
-            boolean canSubmitForChecking
+            boolean canSubmitForChecking,
+            boolean hasResponsibleChiefEditor
     ) {
     }
 

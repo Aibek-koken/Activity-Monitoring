@@ -2,7 +2,7 @@ import { cleanup, fireEvent, render, screen, within } from '@testing-library/rea
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { ApiError, translatorActivityApi } from '../lib/api'
+import { reminderApi, translatorActivityApi } from '../lib/api'
 import { todayLocalDateString } from '../lib/date'
 import type { ActivityDetail } from '../types/activity'
 import { TranslatorActivityDetailPage } from './TranslatorActivityDetailPage'
@@ -30,6 +30,10 @@ vi.mock('../lib/api', () => ({
       this.status = status
       this.fieldErrors = fieldErrors
     }
+  },
+  reminderApi: {
+    list: vi.fn(),
+    markRead: vi.fn(),
   },
   translatorActivityApi: {
     createWorkRecord: vi.fn(),
@@ -63,6 +67,7 @@ const baseActivity: ActivityDetail = {
     canEditWeeklyEstimate: true,
     canFinish: false,
     canSubmitForChecking: false,
+    hasResponsibleChiefEditor: true,
   },
 }
 
@@ -123,6 +128,10 @@ function renderPage(url = '/translator/activities/101') {
 
 describe('TranslatorActivityDetailPage', () => {
   beforeEach(() => {
+    vi.mocked(reminderApi.list).mockReset()
+    vi.mocked(reminderApi.list).mockResolvedValue({ reminders: [] })
+    vi.mocked(reminderApi.markRead).mockReset()
+    vi.mocked(reminderApi.markRead).mockResolvedValue(undefined)
     vi.mocked(translatorActivityApi.get).mockReset()
     vi.mocked(translatorActivityApi.createWorkRecord).mockReset()
     vi.mocked(translatorActivityApi.saveCurrentEstimate).mockReset()
@@ -155,7 +164,7 @@ describe('TranslatorActivityDetailPage', () => {
     expect(screen.getByText('Recorded translated volume will appear here.')).toBeInTheDocument()
   })
 
-  it('keeps the daily task first and opens the estimate from the finish guide', async () => {
+  it('keeps the daily task first and combines finish guidance with the weekly estimate', async () => {
     const user = userEvent.setup()
     vi.mocked(translatorActivityApi.get).mockResolvedValue(baseActivity)
 
@@ -164,12 +173,15 @@ describe('TranslatorActivityDetailPage', () => {
     const estimateToggle = screen.getByRole('button', { name: /Weekly remaining estimate/ })
     expect(dailyHeading.compareDocumentPosition(estimateToggle) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
     expect(estimateToggle).toHaveAttribute('aria-expanded', 'false')
-    expect(screen.getByText(/logged by you/)).toBeInTheDocument()
+    expect(screen.getByText(/logged by you/i)).toBeInTheDocument()
+    expect(screen.queryByText(/Daily records show completed work/)).not.toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'When the translation is done' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Update remaining estimate' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Save estimate' })).not.toBeInTheDocument()
 
-    await user.click(screen.getByRole('button', { name: 'Update remaining estimate' }))
+    await user.click(estimateToggle)
     expect(estimateToggle).toHaveAttribute('aria-expanded', 'true')
-    expect(screen.getByLabelText('Remaining volume (units)')).toHaveFocus()
+    expect(screen.getByLabelText('Remaining volume (units)')).toBeVisible()
   })
 
   it('opens the weekly estimate directly from a reminder link', async () => {
@@ -204,9 +216,9 @@ describe('TranslatorActivityDetailPage', () => {
     await user.click(screen.getByRole('button', { name: 'Save estimate' }))
     expect(translatorActivityApi.saveCurrentEstimate).toHaveBeenCalledWith(101, 0)
     expect(await screen.findByText('0 units left')).toBeInTheDocument()
-    expect(screen.getByText('Week of Oct 19, 2026')).not.toBeVisible()
+    expect(screen.getByText('Oct 19–Oct 25, 2026 · Updated Oct 22, 17:00')).not.toBeVisible()
     await user.click(screen.getByRole('button', { name: 'Show estimate history' }))
-    expect(screen.getByText('Week of Oct 19, 2026')).toBeInTheDocument()
+    expect(screen.getByText('Oct 19–Oct 25, 2026 · Updated Oct 22, 17:00')).toBeInTheDocument()
   })
 
   it('shows estimates read-only to an assisting translator', async () => {
@@ -228,6 +240,28 @@ describe('TranslatorActivityDetailPage', () => {
     expect(screen.queryByRole('button', { name: 'Submit for checking' })).not.toBeInTheDocument()
   })
 
+  it('shows estimate history directly after the activity is finished', async () => {
+    vi.mocked(translatorActivityApi.get).mockResolvedValue({
+      ...baseActivity,
+      status: 'FINISHED',
+      currentWeekEstimate: null,
+      weeklyEstimates: [{ id: 1, weekStartDate: '2026-10-19', remainingTextVolume: 0, updatedAt: '2026-10-22T12:00:00Z' }],
+      permissions: { canEditWorkRecords: false, canEditWeeklyEstimate: false, canFinish: false, canSubmitForChecking: true, hasResponsibleChiefEditor: true },
+    })
+
+    renderPage()
+
+    const estimateHistory = (await screen.findByRole('heading', { name: 'Weekly estimate history' })).closest('section')
+    expect(estimateHistory).not.toBeNull()
+    expect(within(estimateHistory!).getByText('Oct 19–Oct 25, 2026 · Updated Oct 22, 17:00')).not.toBeVisible()
+    fireEvent.click(within(estimateHistory!).getByRole('button', { name: 'Show weekly estimate history' }))
+    expect(within(estimateHistory!).getByText('Oct 19–Oct 25, 2026 · Updated Oct 22, 17:00')).toBeVisible()
+    expect(within(estimateHistory!).getByText('0 units')).toBeVisible()
+    expect(screen.queryByText('No estimate yet')).not.toBeInTheDocument()
+    expect(screen.queryByText('This estimate is read-only after finishing.')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Weekly remaining estimate/ })).not.toBeInTheDocument()
+  })
+
   it('confirms finish, locks records, then submits for checking', async () => {
     const user = userEvent.setup()
     const ready: ActivityDetail = {
@@ -239,7 +273,7 @@ describe('TranslatorActivityDetailPage', () => {
     const finished: ActivityDetail = {
       ...ready,
       status: 'FINISHED',
-      permissions: { canEditWorkRecords: false, canEditWeeklyEstimate: false, canFinish: false, canSubmitForChecking: true },
+      permissions: { canEditWorkRecords: false, canEditWeeklyEstimate: false, canFinish: false, canSubmitForChecking: true, hasResponsibleChiefEditor: true },
     }
     const submitted: ActivityDetail = {
       ...finished,
@@ -266,21 +300,18 @@ describe('TranslatorActivityDetailPage', () => {
     expect(screen.queryByRole('button', { name: 'Submit for checking' })).not.toBeInTheDocument()
   })
 
-  it('keeps a finished activity on screen when submission has no editor', async () => {
-    const user = userEvent.setup()
+  it('disables submission when the project has no responsible editor', async () => {
     vi.mocked(translatorActivityApi.get).mockResolvedValue({
       ...baseActivity,
       status: 'FINISHED',
-      permissions: { canEditWorkRecords: false, canEditWeeklyEstimate: false, canFinish: false, canSubmitForChecking: true },
+      permissions: { canEditWorkRecords: false, canEditWeeklyEstimate: false, canFinish: false, canSubmitForChecking: false, hasResponsibleChiefEditor: false },
     })
-    vi.mocked(translatorActivityApi.submitForChecking).mockRejectedValue(
-      new ApiError(409, 'No responsible Chief Editor is assigned to this project'),
-    )
 
     renderPage()
-    await user.click(await screen.findByRole('button', { name: 'Submit for checking' }))
-    expect(await screen.findByRole('alert')).toHaveTextContent('No responsible Chief Editor is assigned to this project')
-    expect(screen.getByRole('button', { name: 'Submit for checking' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Waiting for Chief Editor assignment' })).toBeInTheDocument()
+    expect(screen.getByText(/Project Manager must assign/)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Submit unavailable' })).toBeDisabled()
+    expect(translatorActivityApi.submitForChecking).not.toHaveBeenCalled()
   })
 
   it('shows an error state when the activity cannot load', async () => {

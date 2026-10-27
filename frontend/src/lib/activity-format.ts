@@ -4,6 +4,7 @@ import type { ActivityStatus } from '../types/activity'
  * The UI is English-only, so pin one locale instead of following the browser.
  */
 export const UI_LOCALE = 'en-US'
+export const BUSINESS_TIME_ZONE = 'Asia/Almaty'
 
 export const activityStatusLabels: Record<ActivityStatus, string> = {
   ASSIGNED: 'Assigned',
@@ -43,6 +44,40 @@ export function formatDate(value: string | null | undefined): string {
     timeZone: 'UTC',
     year: 'numeric',
   }).format(date)
+}
+
+export function formatWeekRange(value: string | null | undefined): string {
+  if (!value) return 'Week unavailable'
+  const start = new Date(`${value}T00:00:00Z`)
+  if (Number.isNaN(start.getTime())) return 'Week unavailable'
+
+  const end = new Date(start)
+  end.setUTCDate(end.getUTCDate() + 6)
+  const shortDate = (date: Date) => new Intl.DateTimeFormat(UI_LOCALE, {
+    day: 'numeric',
+    month: 'short',
+    timeZone: 'UTC',
+  }).format(date)
+
+  return `${shortDate(start)}–${shortDate(end)}, ${end.getUTCFullYear()}`
+}
+
+export function formatDateTimeInAlmaty(value: string | null | undefined): string {
+  if (!value) return 'Update time unavailable'
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return 'Update time unavailable'
+
+  const parts = new Intl.DateTimeFormat(UI_LOCALE, {
+    day: 'numeric',
+    hour: '2-digit',
+    hourCycle: 'h23',
+    minute: '2-digit',
+    month: 'short',
+    timeZone: BUSINESS_TIME_ZONE,
+  }).formatToParts(date)
+  const part = (type: Intl.DateTimeFormatPartTypes) => parts.find((item) => item.type === type)?.value ?? ''
+
+  return `${part('month')} ${part('day')}, ${part('hour')}:${part('minute')}`
 }
 
 export function formatWorkHours(value: number | string | null | undefined): string {

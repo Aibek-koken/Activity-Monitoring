@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { formatDate, formatVolume, formatWorkHours, toNumberOrNull } from './activity-format'
+import { formatDate, formatDateTimeInAlmaty, formatVolume, formatWeekRange, formatWorkHours, toNumberOrNull } from './activity-format'
 
 describe('toNumberOrNull', () => {
   it('passes numbers through', () => {
@@ -64,5 +64,27 @@ describe('formatDate', () => {
     expect(formatDate(null)).toBe('No records yet')
     expect(formatDate(undefined)).toBe('No records yet')
     expect(formatDate('not-a-date')).toBe('No records yet')
+  })
+})
+
+describe('formatDateTimeInAlmaty', () => {
+  it('converts an instant to Kazakhstan business time', () => {
+    expect(formatDateTimeInAlmaty('2026-10-28T00:15:00Z')).toBe('Oct 28, 05:15')
+  })
+
+  it('handles absent and unparsable values', () => {
+    expect(formatDateTimeInAlmaty(null)).toBe('Update time unavailable')
+    expect(formatDateTimeInAlmaty('not-a-date')).toBe('Update time unavailable')
+  })
+})
+
+describe('formatWeekRange', () => {
+  it('shows a compact Monday-to-Sunday range', () => {
+    expect(formatWeekRange('2026-10-26')).toBe('Oct 26–Nov 1, 2026')
+  })
+
+  it('handles absent and unparsable values', () => {
+    expect(formatWeekRange(null)).toBe('Week unavailable')
+    expect(formatWeekRange('not-a-date')).toBe('Week unavailable')
   })
 })

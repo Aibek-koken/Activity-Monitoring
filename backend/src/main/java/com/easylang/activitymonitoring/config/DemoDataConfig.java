@@ -3,24 +3,34 @@ package com.easylang.activitymonitoring.config;
 import com.easylang.activitymonitoring.model.Activity;
 import com.easylang.activitymonitoring.model.ActivityStatus;
 import com.easylang.activitymonitoring.model.ActivityTranslator;
+import com.easylang.activitymonitoring.model.Notification;
+import com.easylang.activitymonitoring.model.NotificationType;
 import com.easylang.activitymonitoring.model.Project;
 import com.easylang.activitymonitoring.model.ProjectChiefEditor;
 import com.easylang.activitymonitoring.model.Role;
 import com.easylang.activitymonitoring.model.User;
+import com.easylang.activitymonitoring.model.WeeklyEstimate;
 import com.easylang.activitymonitoring.model.WorkRecord;
 import com.easylang.activitymonitoring.repository.ActivityRepository;
 import com.easylang.activitymonitoring.repository.ActivityTranslatorRepository;
+import com.easylang.activitymonitoring.repository.NotificationRepository;
 import com.easylang.activitymonitoring.repository.ProjectRepository;
 import com.easylang.activitymonitoring.repository.ProjectChiefEditorRepository;
 import com.easylang.activitymonitoring.repository.UserRepository;
+import com.easylang.activitymonitoring.repository.WeeklyEstimateRepository;
 import com.easylang.activitymonitoring.repository.WorkRecordRepository;
 import java.math.BigDecimal;
+import java.time.Clock;
+import java.time.DayOfWeek;
 import java.time.LocalDate;
+import java.time.temporal.TemporalAdjusters;
 import java.util.List;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Profile;
+import org.springframework.core.env.Environment;
+import org.springframework.core.env.Profiles;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -38,7 +48,11 @@ public class DemoDataConfig implements ApplicationRunner {
     private final ActivityRepository activityRepository;
     private final ActivityTranslatorRepository activityTranslatorRepository;
     private final WorkRecordRepository workRecordRepository;
+    private final WeeklyEstimateRepository weeklyEstimateRepository;
+    private final NotificationRepository notificationRepository;
     private final PasswordEncoder passwordEncoder;
+    private final Clock businessClock;
+    private final Environment environment;
 
     public DemoDataConfig(
             UserRepository userRepository,
@@ -47,7 +61,11 @@ public class DemoDataConfig implements ApplicationRunner {
             ActivityRepository activityRepository,
             ActivityTranslatorRepository activityTranslatorRepository,
             WorkRecordRepository workRecordRepository,
-            PasswordEncoder passwordEncoder
+            WeeklyEstimateRepository weeklyEstimateRepository,
+            NotificationRepository notificationRepository,
+            PasswordEncoder passwordEncoder,
+            Clock businessClock,
+            Environment environment
     ) {
         this.userRepository = userRepository;
         this.projectRepository = projectRepository;
@@ -55,7 +73,11 @@ public class DemoDataConfig implements ApplicationRunner {
         this.activityRepository = activityRepository;
         this.activityTranslatorRepository = activityTranslatorRepository;
         this.workRecordRepository = workRecordRepository;
+        this.weeklyEstimateRepository = weeklyEstimateRepository;
+        this.notificationRepository = notificationRepository;
         this.passwordEncoder = passwordEncoder;
+        this.businessClock = businessClock;
+        this.environment = environment;
     }
 
     @Override
@@ -143,6 +165,10 @@ public class DemoDataConfig implements ApplicationRunner {
                 new BigDecimal("5.75"),
                 null
         );
+
+        if (!environment.acceptsProfiles(Profiles.of("test"))) {
+            seedSprint3Showcase(translator, privacyPolicy, contractAppendix);
+        }
     }
 
     private User findOrCreateUser(SeedUser seed) {
@@ -201,6 +227,55 @@ public class DemoDataConfig implements ApplicationRunner {
         ).orElseGet(() -> workRecordRepository.save(
                 new WorkRecord(activity, translator, recordDate, translatedVolume, workHours)
         ));
+    }
+
+    private void seedSprint3Showcase(User translator, Activity estimateActivity, Activity reminderActivity) {
+        LocalDate today = LocalDate.now(businessClock);
+        LocalDate currentWeek = today.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
+
+        estimateIfMissing(estimateActivity, translator, currentWeek.minusWeeks(2), new BigDecimal("410.00"));
+        estimateIfMissing(estimateActivity, translator, currentWeek.minusWeeks(1), new BigDecimal("260.00"));
+        estimateIfMissing(estimateActivity, translator, currentWeek, new BigDecimal("120.00"));
+
+        notificationIfMissing(new Notification(
+                translator,
+                null,
+                NotificationType.DAILY_RECORD_REMINDER,
+                today,
+                "Record today's translated volume for your active work.",
+                businessClock.instant()
+        ));
+        notificationIfMissing(new Notification(
+                translator,
+                reminderActivity,
+                NotificationType.WEEKLY_ESTIMATE_REMINDER,
+                currentWeek,
+                "Add this week's remaining-volume estimate for " + reminderActivity.getActivityNumber() + ".",
+                businessClock.instant()
+        ));
+    }
+
+    private void estimateIfMissing(
+            Activity activity,
+            User translator,
+            LocalDate weekStart,
+            BigDecimal remainingVolume
+    ) {
+        if (!weeklyEstimateRepository.existsByActivityIdAndWeekStartDate(activity.getId(), weekStart)) {
+            weeklyEstimateRepository.save(new WeeklyEstimate(
+                    activity,
+                    translator,
+                    weekStart,
+                    remainingVolume,
+                    businessClock.instant()
+            ));
+        }
+    }
+
+    private void notificationIfMissing(Notification notification) {
+        if (!notificationRepository.existsByDedupeKey(notification.getDedupeKey())) {
+            notificationRepository.save(notification);
+        }
     }
 
     private record SeedUser(String email, String initials, String fullName, Role role) {

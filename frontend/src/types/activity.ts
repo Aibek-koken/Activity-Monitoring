@@ -50,6 +50,7 @@ export interface ActivityDetail extends ActivitySummary {
     canEditWeeklyEstimate: boolean
     canFinish: boolean
     canSubmitForChecking: boolean
+    hasResponsibleChiefEditor: boolean
   }
 }
 
