@@ -1,6 +1,6 @@
-# Current API Contract (Sprints 1–2 and Sprint 3 estimate slice)
+# Current API Contract (Sprints 1–3)
 
-Last updated: 2026-10-22
+Last updated: 2026-10-24
 
 Base path: `/api/v1`
 
@@ -46,7 +46,7 @@ The password hash and JWT are never returned in JSON.
 | GET | `/workspaces/chief-editor` | `CHIEF_EDITOR` |
 | GET | `/workspaces/project-manager` | `PROJECT_MANAGER` |
 
-These small endpoints prove that the server, not only the React router, enforces role separation. Future domain endpoints should follow the same server-side rule.
+These small endpoints prove that the server, not only the React router, enforces role separation. Domain endpoints follow the same server-side rule.
 
 ## Translator activities and daily work records
 
@@ -59,8 +59,10 @@ Every endpoint below requires the `TRANSLATOR` role and an assignment to the req
 | POST | `/translator/activities/{activityId}/work-records` | Create one daily record; return refreshed activity detail |
 | PUT | `/translator/activities/{activityId}/work-records/{recordId}` | Edit this translator's existing record volume/hours; return refreshed activity detail |
 | PUT | `/translator/activities/{activityId}/weekly-estimates/current` | Responsible translator creates/updates the current week's remaining-volume estimate; return refreshed detail |
+| POST | `/translator/activities/{activityId}/finish` | Responsible translator finishes an active activity after saving zero remaining for the current week; return refreshed detail |
+| POST | `/translator/activities/{activityId}/submit-for-checking` | Responsible translator submits a `FINISHED` activity to the project's responsible Chief Editor; create Review cycle 1 and return refreshed detail |
 
-The list response is `{ "activities": [...] }`. Each summary contains `id`, `activityNumber`, `activityName`, `projectName`, `status`, `responsible`, `assignedDate`, and `progress`. Detail adds `createdDate`, `workRecords`, `currentWeek`, nullable `currentWeekEstimate`, `weeklyEstimates` (newest first), and server-computed `permissions`. `currentWeek` contains `startDate` and `endDate`; each estimate contains `id`, `weekStartDate`, `remainingTextVolume`, and `updatedAt`. `permissions` contains `canEditWorkRecords`, `canEditWeeklyEstimate`, `canFinish`, and `canSubmitForChecking`. The last two permissions describe eligibility for planned actions; their endpoints do not exist yet. `progress` contains `totalTranslatedVolume`, `recordCount`, and nullable `lastRecordDate`; it is the signed-in translator's cumulative work. Each work record contains `id`, `recordDate`, `translatedVolume`, and nullable `workHours`.
+The list response is `{ "activities": [...] }`. Each summary contains `id`, `activityNumber`, `activityName`, `projectName`, `status`, `responsible`, `assignedDate`, and `progress`. Detail adds `createdDate`, `workRecords`, `currentWeek`, nullable `currentWeekEstimate`, `weeklyEstimates` (newest first), and server-computed `permissions`. `currentWeek` contains `startDate` and `endDate`; each estimate contains `id`, `weekStartDate`, `remainingTextVolume`, and `updatedAt`. `permissions` contains `canEditWorkRecords`, `canEditWeeklyEstimate`, `canFinish`, and `canSubmitForChecking`. The server calculates these action permissions. `progress` contains `totalTranslatedVolume`, `recordCount`, and nullable `lastRecordDate`; it is the signed-in translator's cumulative work. Each work record contains `id`, `recordDate`, `translatedVolume`, and nullable `workHours`.
 
 Create body: `{ "recordDate": "2026-10-22", "translatedVolume": 12.50, "workHours": 4.25 }`. Update body has `translatedVolume` and optional `workHours`; record date cannot be changed. Volume must be greater than zero and at most 1000 with up to two decimals; hours, if supplied, must be 0–24 with up to two decimals. Future record dates are rejected. A second record for the same translator/activity/date returns 409.
 
@@ -68,7 +70,20 @@ The UI's assignment role/status/assigned-date filters are currently client-side 
 
 Estimate body: `{ "remainingTextVolume": 120.50 }`. The server calculates the Monday week start in `Asia/Almaty`; the client cannot submit a date. The value must be non-negative and fit `NUMERIC(14,2)`. Repeated saves update the same activity/week row. Assistants receive 403, unassigned translators 404, and estimates are locked once the activity is no longer `ASSIGNED` or `IN_PROGRESS` (409). Daily work records are also locked in those states.
 
-Sprint 3 reminder, finish, and submit-for-checking routes are planned in `SPRINT_3_PLAN.md` and do not exist yet.
+`finish` accepts only `ASSIGNED` or `IN_PROGRESS` with a saved zero estimate for the current week and moves the activity to `FINISHED`. Daily records and estimates then become read-only. `submit-for-checking` accepts only `FINISHED` and atomically creates one Review cycle assigned to the project's active responsible Chief Editor while moving the activity to `UNDER_CHECKING`. Missing editor, stale state, and repeated transitions return 409. Assistants receive 403; unassigned translators receive 404.
+
+## Translator reminders
+
+Both routes require the `TRANSLATOR` role. Marking a reminder read requires CSRF and only the owning translator can do it.
+
+| Method | Path | Purpose |
+| --- | --- | --- |
+| GET | `/translator/reminders` | List unread, still-relevant daily and weekly reminders for the current business period |
+| PATCH | `/translator/reminders/{notificationId}/read` | Mark an owned reminder read; return 204 |
+
+The list response is `{ "reminders": [...] }`. Each reminder contains `id`, `type`, `periodDate`, `message`, and nullable `activityId`/`activityNumber`. Types are `DAILY_RECORD_REMINDER` and `WEEKLY_ESTIMATE_REMINDER`. The daily reminder is user-level; weekly reminders link to a responsible activity. A reminder stops appearing when its work record or weekly estimate is supplied, when the assignment ceases to be active, or when its day/week passes. An unknown or other user's reminder returns 404.
+
+The hourly evaluator runs in `Asia/Almaty` by default and also catches up at application startup. It creates a daily reminder after 18:00 on weekdays for a translator with an active assignment and no record anywhere that day; on Friday after 16:00 it creates a weekly reminder for each active responsible activity missing that week's estimate. Database keys prevent duplicate reminders.
 
 ## Error shape
 
@@ -83,4 +98,4 @@ Sprint 3 reminder, finish, and submit-for-checking routes are planned in `SPRINT
 }
 ```
 
-Expected status codes are `400` for validation, `401` for missing/invalid authentication, and `403` for an authenticated user with the wrong role.
+Expected status codes are `400` for validation, `401` for missing/invalid authentication, `403` for a wrong role or an assistant attempting a responsible-only action, `404` for an unassigned activity or another user's reminder, and `409` for duplicate data or an invalid lifecycle transition.

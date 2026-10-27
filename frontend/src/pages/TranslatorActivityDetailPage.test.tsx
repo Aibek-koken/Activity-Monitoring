@@ -2,7 +2,7 @@ import { cleanup, fireEvent, render, screen, within } from '@testing-library/rea
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { translatorActivityApi } from '../lib/api'
+import { ApiError, translatorActivityApi } from '../lib/api'
 import { todayLocalDateString } from '../lib/date'
 import type { ActivityDetail } from '../types/activity'
 import { TranslatorActivityDetailPage } from './TranslatorActivityDetailPage'
@@ -34,7 +34,9 @@ vi.mock('../lib/api', () => ({
   translatorActivityApi: {
     createWorkRecord: vi.fn(),
     get: vi.fn(),
+    finish: vi.fn(),
     saveCurrentEstimate: vi.fn(),
+    submitForChecking: vi.fn(),
     updateWorkRecord: vi.fn(),
   },
 }))
@@ -124,6 +126,8 @@ describe('TranslatorActivityDetailPage', () => {
     vi.mocked(translatorActivityApi.get).mockReset()
     vi.mocked(translatorActivityApi.createWorkRecord).mockReset()
     vi.mocked(translatorActivityApi.saveCurrentEstimate).mockReset()
+    vi.mocked(translatorActivityApi.finish).mockReset()
+    vi.mocked(translatorActivityApi.submitForChecking).mockReset()
     vi.mocked(translatorActivityApi.updateWorkRecord).mockReset()
   })
 
@@ -151,6 +155,32 @@ describe('TranslatorActivityDetailPage', () => {
     expect(screen.getByText('Recorded translated volume will appear here.')).toBeInTheDocument()
   })
 
+  it('keeps the daily task first and opens the estimate from the finish guide', async () => {
+    const user = userEvent.setup()
+    vi.mocked(translatorActivityApi.get).mockResolvedValue(baseActivity)
+
+    renderPage()
+    const dailyHeading = await screen.findByRole('heading', { name: 'Record daily work' })
+    const estimateToggle = screen.getByRole('button', { name: /Weekly remaining estimate/ })
+    expect(dailyHeading.compareDocumentPosition(estimateToggle) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(estimateToggle).toHaveAttribute('aria-expanded', 'false')
+    expect(screen.getByText(/logged by you/)).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Save estimate' })).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Update remaining estimate' }))
+    expect(estimateToggle).toHaveAttribute('aria-expanded', 'true')
+    expect(screen.getByLabelText('Remaining volume (units)')).toHaveFocus()
+  })
+
+  it('opens the weekly estimate directly from a reminder link', async () => {
+    vi.mocked(translatorActivityApi.get).mockResolvedValue(baseActivity)
+
+    renderPage('/translator/activities/101#weekly-estimate')
+
+    expect(await screen.findByRole('button', { name: /Weekly remaining estimate/ })).toHaveAttribute('aria-expanded', 'true')
+    expect(screen.getByLabelText('Remaining volume (units)')).toBeVisible()
+  })
+
   it('validates and saves the current weekly estimate', async () => {
     const user = userEvent.setup()
     const saved: ActivityDetail = {
@@ -163,7 +193,7 @@ describe('TranslatorActivityDetailPage', () => {
     vi.mocked(translatorActivityApi.saveCurrentEstimate).mockResolvedValue(saved)
 
     renderPage()
-    await screen.findByRole('heading', { name: 'Weekly remaining' })
+    await user.click(await screen.findByRole('button', { name: /Weekly remaining estimate/ }))
     await user.type(screen.getByLabelText('Remaining volume (units)'), '-1')
     await user.click(screen.getByRole('button', { name: 'Save estimate' }))
     expect(screen.getByRole('alert')).toHaveTextContent('Enter a non-negative number')
@@ -173,7 +203,7 @@ describe('TranslatorActivityDetailPage', () => {
     await user.type(screen.getByLabelText('Remaining volume (units)'), '0')
     await user.click(screen.getByRole('button', { name: 'Save estimate' }))
     expect(translatorActivityApi.saveCurrentEstimate).toHaveBeenCalledWith(101, 0)
-    expect(await screen.findByText('0 units remaining')).toBeInTheDocument()
+    expect(await screen.findByText('0 units left')).toBeInTheDocument()
     expect(screen.getByText('Week of Oct 19, 2026')).not.toBeVisible()
     await user.click(screen.getByRole('button', { name: 'Show estimate history' }))
     expect(screen.getByText('Week of Oct 19, 2026')).toBeInTheDocument()
@@ -189,10 +219,68 @@ describe('TranslatorActivityDetailPage', () => {
     })
 
     renderPage()
-    await screen.findByRole('heading', { name: 'Weekly remaining' })
-    expect(screen.getByText('Only the responsible translator can update this estimate.')).toBeInTheDocument()
+    await screen.findByRole('button', { name: /Weekly remaining estimate/ })
     expect(screen.queryByRole('button', { name: 'Save estimate' })).not.toBeInTheDocument()
-    expect(screen.getByText('120 units remaining')).toBeInTheDocument()
+    expect(screen.getByText('120 units left')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /Weekly remaining estimate/ }))
+    expect(screen.getByText('Only the responsible translator can update this estimate.')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Finish translation' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Submit for checking' })).not.toBeInTheDocument()
+  })
+
+  it('confirms finish, locks records, then submits for checking', async () => {
+    const user = userEvent.setup()
+    const ready: ActivityDetail = {
+      ...baseActivity,
+      currentWeekEstimate: { id: 1, weekStartDate: '2026-10-19', remainingTextVolume: 0, updatedAt: '2026-10-22T12:00:00Z' },
+      weeklyEstimates: [{ id: 1, weekStartDate: '2026-10-19', remainingTextVolume: 0, updatedAt: '2026-10-22T12:00:00Z' }],
+      permissions: { ...baseActivity.permissions, canFinish: true },
+    }
+    const finished: ActivityDetail = {
+      ...ready,
+      status: 'FINISHED',
+      permissions: { canEditWorkRecords: false, canEditWeeklyEstimate: false, canFinish: false, canSubmitForChecking: true },
+    }
+    const submitted: ActivityDetail = {
+      ...finished,
+      status: 'UNDER_CHECKING',
+      permissions: { ...finished.permissions, canSubmitForChecking: false },
+    }
+    vi.mocked(translatorActivityApi.get).mockResolvedValue(ready)
+    vi.mocked(translatorActivityApi.finish).mockResolvedValue(finished)
+    vi.mocked(translatorActivityApi.submitForChecking).mockResolvedValue(submitted)
+
+    renderPage()
+    await screen.findByRole('button', { name: 'Finish translation' })
+    await user.click(screen.getByRole('button', { name: 'Finish translation' }))
+    expect(screen.getByText(/Finishing locks daily records/)).toBeInTheDocument()
+    expect(translatorActivityApi.finish).not.toHaveBeenCalled()
+    await user.click(screen.getByRole('button', { name: 'Confirm finish' }))
+    expect(translatorActivityApi.finish).toHaveBeenCalledWith(101)
+    expect(await screen.findByRole('button', { name: 'Submit for checking' })).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Record daily work' })).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Submit for checking' }))
+    expect(translatorActivityApi.submitForChecking).toHaveBeenCalledWith(101)
+    expect(await screen.findByRole('heading', { name: 'Under checking' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Submit for checking' })).not.toBeInTheDocument()
+  })
+
+  it('keeps a finished activity on screen when submission has no editor', async () => {
+    const user = userEvent.setup()
+    vi.mocked(translatorActivityApi.get).mockResolvedValue({
+      ...baseActivity,
+      status: 'FINISHED',
+      permissions: { canEditWorkRecords: false, canEditWeeklyEstimate: false, canFinish: false, canSubmitForChecking: true },
+    })
+    vi.mocked(translatorActivityApi.submitForChecking).mockRejectedValue(
+      new ApiError(409, 'No responsible Chief Editor is assigned to this project'),
+    )
+
+    renderPage()
+    await user.click(await screen.findByRole('button', { name: 'Submit for checking' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('No responsible Chief Editor is assigned to this project')
+    expect(screen.getByRole('button', { name: 'Submit for checking' })).toBeInTheDocument()
   })
 
   it('shows an error state when the activity cannot load', async () => {
@@ -227,7 +315,8 @@ describe('TranslatorActivityDetailPage', () => {
     expect(screen.getAllByText('EL-2026-001')).toHaveLength(2)
     expect(screen.queryByRole('button', { name: 'Edit' })).not.toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Show history' }))
-    expect(screen.getAllByText('8.25')).toHaveLength(2)
+    expect(screen.getByText('8.25 units')).toBeInTheDocument()
+    expect(screen.getByText('8.25')).toBeInTheDocument()
     expect(screen.getByText('2 h 30 min')).toBeInTheDocument()
   })
 
@@ -292,8 +381,8 @@ describe('TranslatorActivityDetailPage', () => {
     await screen.findByRole('heading', { name: 'Daily history' })
     fireEvent.click(screen.getByRole('button', { name: 'Show history' }))
     expect(screen.getByRole('heading', { name: 'No daily records yet' })).toBeInTheDocument()
-    expect(screen.getAllByText('No records yet').length).toBeGreaterThan(0)
-    expect(screen.getByRole('heading', { name: 'Record translated volume' })).toBeInTheDocument()
+    expect(screen.getByText('0 units')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Record daily work' })).toBeInTheDocument()
   })
 
   it('shows inline validation before saving a daily record', async () => {
@@ -301,7 +390,7 @@ describe('TranslatorActivityDetailPage', () => {
 
     renderPage()
 
-    await screen.findByRole('heading', { name: 'Record translated volume' })
+    await screen.findByRole('heading', { name: 'Record daily work' })
     fireEvent.click(screen.getByRole('button', { name: 'Save record' }))
 
     expect(screen.getByText('Enter translated volume.')).toBeInTheDocument()
@@ -314,7 +403,7 @@ describe('TranslatorActivityDetailPage', () => {
 
     renderPage()
 
-    await screen.findByRole('heading', { name: 'Record translated volume' })
+    await screen.findByRole('heading', { name: 'Record daily work' })
     await user.type(screen.getByLabelText('Translated volume (units)'), '4.5')
     await user.type(screen.getByLabelText('Hours (optional)'), '3')
     await user.type(screen.getByLabelText('Minutes'), '90')
@@ -347,7 +436,7 @@ describe('TranslatorActivityDetailPage', () => {
 
     renderPage()
 
-    await screen.findByRole('heading', { name: 'Record translated volume' })
+    await screen.findByRole('heading', { name: 'Record daily work' })
     await user.type(screen.getByLabelText('Translated volume (units)'), '4.5')
     await user.click(screen.getByRole('button', { name: 'Save record' }))
 
@@ -378,7 +467,7 @@ describe('TranslatorActivityDetailPage', () => {
 
     renderPage()
 
-    await screen.findByRole('heading', { name: 'Record translated volume' })
+    await screen.findByRole('heading', { name: 'Record daily work' })
     await user.click(screen.getByRole('button', { name: 'Show history' }))
     await user.click(screen.getAllByRole('button', { name: 'Edit' })[1])
 
@@ -454,7 +543,7 @@ describe('TranslatorActivityDetailPage', () => {
     fireEvent.change(screen.getByLabelText('To date'), { target: { value: '2026-09-29' } })
 
     expect(screen.getByRole('heading', { name: 'No records in this period' })).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'Record translated volume' })).toBeInTheDocument()
-    expect(screen.getAllByText('8.25')).toHaveLength(1)
+    expect(screen.getByRole('heading', { name: 'Record daily work' })).toBeInTheDocument()
+    expect(screen.getByText('8.25 units')).toBeInTheDocument()
   })
 })

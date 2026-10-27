@@ -1,6 +1,6 @@
 # Run EasyLang locally
 
-Sprint 1 and Sprint 2 are complete locally. Sprint 3 is in progress: weekly estimates are available, while finish/submission and reminders remain planned. The commands below run the current application.
+Sprints 1–3 run locally. Sprint 3 adds weekly estimates, in-app reminders, Finish, and submission for Chief Editor checking. The commands below run the current application.
 
 ## 1. PostgreSQL
 
@@ -38,16 +38,6 @@ Postgres:
 docker compose exec postgres psql -U easylang -d easylang
 ```
 
-Поменять статус активности:
-
-```sql
-UPDATE activities
-SET status = 'CORRECTION_REQUIRED'
-WHERE activity_number = 'EL-2026-118';
-```
-
-Потом обнови браузер на `/translator`.
-
 Посмотреть допустимые активности:
 
 ```sql
@@ -72,7 +62,9 @@ ORDER BY a.activity_number;
 
 - `backend/src/main/java/.../service/TranslatorActivityService.java` — главная бизнес-логика переводчика.
 
-- `backend/src/main/java/.../service/TranslatorProgressService.java` — сохранение недельной оценки.
+- `backend/src/main/java/.../service/TranslatorProgressService.java` — недельная оценка, завершение и отправка на проверку.
+
+- `backend/src/main/java/.../service/ReminderService.java` — проверка ежедневных и еженедельных напоминаний.
 
 - `frontend/src/pages/TranslatorActivitiesPage.tsx` — список активностей.
 
@@ -81,3 +73,24 @@ ORDER BY a.activity_number;
 - `frontend/src/lib/activity-format.ts` — как форматируются числа/даты/часы.
 
 - `frontend/src/lib/validation.ts` — UI-валидация.
+
+## Sprint 3 checks
+
+```bash
+cd backend && mvn test
+cd frontend && npm test && npm run lint && npm run build
+```
+
+PostgreSQL-specific tests use a separate database named `easylang_postgres_query_test` and run with `POSTGRES_INTEGRATION_TESTS=true` from `backend/`. The Playwright Sprint 3 write-through test changes activity state, so it requires a disposable database and the explicit flag `E2E_ISOLATED_DB=true`:
+
+```bash
+docker compose exec postgres createdb -U easylang easylang_sprint3_e2e
+# Start the API from backend/ with:
+DB_URL=jdbc:postgresql://localhost:55432/easylang_sprint3_e2e mvn spring-boot:run
+# Start Vite from frontend/ in another terminal, then run from frontend/:
+E2E_ISOLATED_DB=true npm run test:e2e -- --workers=1
+```
+
+Without the flag, the state-changing browser test is skipped. Its desktop variant runs once; tablet and mobile runs cover the read-only path. Recreate the disposable database before repeating the full write-through flow.
+
+Reminder evaluation uses the business zone (`BUSINESS_ZONE`, default `Asia/Almaty`) and is enabled by default. `REMINDER_SCHEDULING_ENABLED=false` disables the scheduled evaluator for deterministic tests; it does not disable the reminder API.

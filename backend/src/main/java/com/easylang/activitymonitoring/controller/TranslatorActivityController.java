@@ -75,4 +75,20 @@ public class TranslatorActivityController {
     ) {
         return translatorProgressService.saveCurrentEstimate(principal.user().getId(), activityId, request);
     }
+
+    @PostMapping("/{activityId}/finish")
+    public ActivityDetailResponse finish(
+            @AuthenticationPrincipal AuthenticatedUser principal,
+            @PathVariable Long activityId
+    ) {
+        return translatorProgressService.finish(principal.user().getId(), activityId);
+    }
+
+    @PostMapping("/{activityId}/submit-for-checking")
+    public ActivityDetailResponse submitForChecking(
+            @AuthenticationPrincipal AuthenticatedUser principal,
+            @PathVariable Long activityId
+    ) {
+        return translatorProgressService.submitForChecking(principal.user().getId(), activityId);
+    }
 }

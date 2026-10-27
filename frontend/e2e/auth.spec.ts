@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test'
 
 const accounts = [
-  { role: 'Translator', path: '/translator', heading: 'Welcome, Maya' },
+  { role: 'Translator', path: '/translator', heading: 'Assigned activities' },
   { role: 'Chief Editor', path: '/chief-editor', heading: 'Welcome, Elias' },
   { role: 'Project Manager', path: '/project-manager', heading: 'Welcome, Oliver' },
 ] as const
@@ -23,8 +23,13 @@ for (const account of accounts) {
 
     await expect(page).toHaveURL(new RegExp(`${account.path}$`))
     await expect(page.getByRole('heading', { name: new RegExp(account.heading) })).toBeVisible()
-    await expect(page.getByRole('heading', { name: 'Your workspace' })).toBeVisible()
-    await expect(page.locator('.profile-details').getByText(account.role, { exact: true })).toBeVisible()
+    if (account.role === 'Translator') {
+      await expect(page.getByRole('region', { name: 'Assigned activities', exact: true })).toBeVisible()
+      await expect(page.getByText('Maya Chen', { exact: true })).toBeVisible()
+    } else {
+      await expect(page.getByRole('heading', { name: 'Your workspace' })).toBeVisible()
+      await expect(page.locator('.profile-details').getByText(account.role, { exact: true })).toBeVisible()
+    }
     if (account.role === 'Project Manager') {
       await page.screenshot({ path: testInfo.outputPath('project-manager-workspace.png'), fullPage: true })
     }
@@ -37,7 +42,7 @@ test('invalid credentials keep the form and show a clear error', async ({ page }
   await page.getByRole('button', { name: /^Sign in$/ }).click()
 
   await expect(page).toHaveURL(/\/login$/)
-  await expect(page.getByRole('alert')).toContainText('Email or password is incorrect')
+  await expect(page.getByRole('alert')).toContainText('We could not sign you in with these details.')
   await expect(page.getByLabel('Email')).toHaveValue('translator@easylang.local')
 })
 

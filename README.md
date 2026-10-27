@@ -10,7 +10,7 @@
 
 **Full-stack activity tracking system with secure authentication, role-based workspaces, and translator progress records.**
 
-**Project status:** Sprint 1 and Sprint 2 are complete locally. Sprint 3 is in progress: the database foundation and weekly remaining-volume estimates are implemented. Daily/weekly reminders, the `FINISHED` transition, and submission for Chief Editor checking are next.
+**Project status:** Sprints 1–3 are implemented locally. Translators can record daily work, save weekly remaining-volume estimates, receive in-app reminders, finish at zero remaining, and submit finished activities for Chief Editor checking.
 
 The repository contains an independent Spring Boot API and React/TypeScript frontend. The strongest part of the project is the security and access model: authentication is enforced on the server, protected again in the client, and tied to real database-backed roles.
 
@@ -19,7 +19,8 @@ The repository contains an independent Spring Boot API and React/TypeScript fron
 - **Secure auth** — Spring Security + BCrypt + JWT stored in an `HttpOnly`, `SameSite=Lax` cookie.
 - **CSRF protection** — the frontend requests and sends CSRF tokens for state-changing requests.
 - **Double-layer RBAC** — Translator, Chief Editor, and Project Manager access is protected on both backend and frontend.
-- **Activity workflow** — translators can view assigned activities, create/update work records, and track progress.
+- **Activity workflow** — translators can view assigned activities, create/update work records and weekly estimates, finish eligible work, and submit it for checking.
+- **Relevant reminders** — persisted daily and weekly prompts link to the missing work and disappear when it is supplied.
 - **Database discipline** — PostgreSQL + Flyway migrations, constraints, uniqueness rules, and indexes.
 - **Verification** — backend integration tests, frontend unit tests, lint/build gates, and Playwright end-to-end coverage.
 
@@ -40,7 +41,7 @@ flowchart LR
 
 | Role | Workspace |
 | --- | --- |
-| Translator | Assigned activities and work records |
+| Translator | Assigned activities, work records, weekly estimates, reminders, and submission |
 | Chief Editor | Protected editor workspace |
 | Project Manager | Protected manager workspace |
 
@@ -70,8 +71,9 @@ cd backend && mvn test
 cd frontend && npm test
 cd frontend && npm run lint
 cd frontend && npm run build
-cd frontend && npm run test:e2e
 ```
+
+Run Playwright against a disposable PostgreSQL database with `E2E_ISOLATED_DB=true`; see [run guide](docs/run.md). The Sprint 3 browser flow changes an activity to `UNDER_CHECKING`.
 
 ## Delivery roadmap
 
@@ -79,9 +81,9 @@ cd frontend && npm run test:e2e
 | --- | --- | --- |
 | Sprint 1 | Complete locally | Authentication, role-based access, starter workspaces |
 | Sprint 2 | Complete locally | Translator assignments, activity details, daily work records, history and filters |
-| Sprint 3 | In progress | Weekly remaining estimates implemented; reminders, finish and submission for checking next |
+| Sprint 3 | Complete locally | Weekly estimates, daily/weekly reminders, Finish, and submission with Review cycle 1 |
 | Sprint 4 | Planned | Chief Editor checking and corrections |
 | Sprint 5 | Planned | Project Manager creation, assignment, workload and risk monitoring |
 | Sprint 6 | Planned | Integrated alpha workflow and demonstration |
 
-See [Sprint 2 status](docs/SPRINT_2_STATUS.md) for delivered behavior, the [Sprint 2 process report](docs/SPRINT_2_PROCESS_REPORT.md) for the full documentation handoff, and the [Sprint 3 plan](docs/SPRINT_3_PLAN.md) for the current scope and remaining stages. The current system is described in [architecture](docs/ARCHITECTURE.md), the [API contract](docs/API.md), and [STATE.md](docs/STATE.md).
+See [Sprint 2 status](docs/SPRINT_2_STATUS.md) for delivered behavior, the [Sprint 2 process report](docs/SPRINT_2_PROCESS_REPORT.md) for the full documentation handoff, and the [Sprint 3 status](docs/SPRINT_3_STATUS.md) for the completed flow and verification. The current system is described in [architecture](docs/ARCHITECTURE.md), the [API contract](docs/API.md), and [STATE.md](docs/STATE.md).

@@ -24,6 +24,11 @@ public interface WorkRecordRepository extends JpaRepository<WorkRecord, Long> {
 
     long countByActivityIdAndTranslatorId(Long activityId, Long translatorId);
 
+    boolean existsByTranslatorIdAndRecordDate(Long translatorId, LocalDate recordDate);
+
+    @Query("select distinct record.translator.id from WorkRecord record where record.recordDate = :recordDate")
+    List<Long> findTranslatorIdsWithRecordsOn(@Param("recordDate") LocalDate recordDate);
+
     @Query("""
             select coalesce(sum(record.translatedVolume), 0)
             from WorkRecord record

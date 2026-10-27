@@ -1,6 +1,6 @@
 # Decisions
 
-Last updated: 2026-10-22
+Last updated: 2026-10-24
 
 | Date | Decision | Reason |
 | --- | --- | --- |
@@ -20,5 +20,7 @@ Last updated: 2026-10-22
 | 2026-10-01 | Treat applied Flyway migrations as immutable; keep restored V2 content and move the translated-volume column rename into V3. | V2 may already exist in local or teammate databases, so changing its checksum would make upgrades fragile. |
 | 2026-10-22 | Limit a translator to 5 active responsible assignments and 10 active assisting assignments, counted separately; only `COMPLETED` frees a place. Enforce this when Project Manager assignment is built. | The current Sprint 2 data is demo-seeded and has no assignment API or manager UI. The future service must check the relevant quota atomically with assignment creation and return a clear conflict; the manager UI should show each quota and explain when it is full. Chief Editors do not assign translators. |
 | 2026-10-22 | Close Sprint 2 locally and scope Sprint 3 to US-08–US-12: daily/weekly reminders, weekly estimates, zero-remaining `FINISHED`, and submission for checking. | The sprint distribution explicitly includes “submission”; the database design maps US-12 to a Review cycle. Chief Editor checking/results remain Sprint 4, while reminder and estimate policies stay visible for confirmation in `SPRINT_3_PLAN.md`. |
-| 2026-10-22 | Adopt the Sprint 3 plan's working defaults: Monday–Sunday weeks in `Asia/Almaty`; responsible translator owns one current-week estimate per activity; zero remaining requires a separate Finish action; daily and estimate writes lock after `FINISHED`; weekday 18:00 daily and Friday 16:00 weekly in-app reminders. | Starting implementation establishes a consistent server-owned contract. Reminder scheduling and finish/submission behavior still need implementation and tests. |
+| 2026-10-22 | Adopt the Sprint 3 plan's working defaults: Monday–Sunday weeks in `Asia/Almaty`; responsible translator owns one current-week estimate per activity; zero remaining requires a separate Finish action; daily and estimate writes lock after `FINISHED`; weekday 18:00 daily and Friday 16:00 weekly in-app reminders. | This establishes a consistent server-owned contract for estimates, lifecycle actions, and reminders. |
 | 2026-10-22 | Use a nullable unique responsible-project key for Chief Editor assignment and a unique notification dedupe key in V4. | Both database constraints work in PostgreSQL and the existing H2 test profile while enforcing one responsible editor per project and preventing repeated reminders. |
+| 2026-10-23 | Evaluate reminders hourly and at application startup; persist each notification in a separate transaction and hide it when the missing requirement is satisfied or the period expires. | An application restart after a cutoff still creates current-period reminders, concurrent evaluators cannot duplicate a key, and translators do not see stale work. |
+| 2026-10-23 | Make Finish and Submit separate responsible-translator actions, lock the activity row for transitions, and create Review cycle 1 in the Submit transaction. | Confirmation prevents an accidental zero estimate from silently changing status; row locking and the review uniqueness constraint protect the lifecycle from double requests. |

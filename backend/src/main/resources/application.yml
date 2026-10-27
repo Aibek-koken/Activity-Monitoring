@@ -32,6 +32,8 @@ management:
 app:
   seed-demo-users: ${SEED_DEMO_USERS:true}
   business-zone: ${BUSINESS_ZONE:Asia/Almaty}
+  reminders:
+    scheduling-enabled: ${REMINDER_SCHEDULING_ENABLED:true}
   security:
     jwt-secret: ${JWT_SECRET:ZWFzeWxhbmctZGV2ZWxvcG1lbnQtc2VjcmV0LWNoYW5nZS1tZS0yMDI2}
     token-ttl: ${JWT_TTL:PT8H}

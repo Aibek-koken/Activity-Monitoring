@@ -81,6 +81,20 @@ public class Activity {
         }
     }
 
+    public void finish() {
+        if (status != ActivityStatus.ASSIGNED && status != ActivityStatus.IN_PROGRESS) {
+            throw new IllegalStateException("Only an assigned or in-progress activity can be finished");
+        }
+        status = ActivityStatus.FINISHED;
+    }
+
+    public void submitForChecking() {
+        if (status != ActivityStatus.FINISHED) {
+            throw new IllegalStateException("Only a finished activity can be submitted for checking");
+        }
+        status = ActivityStatus.UNDER_CHECKING;
+    }
+
     public LocalDate getCreatedDate() {
         return createdDate;
     }

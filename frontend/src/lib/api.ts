@@ -5,6 +5,7 @@ import type {
   CreateWorkRecordPayload,
   UpdateWorkRecordPayload,
 } from '../types/activity'
+import type { Reminder } from '../types/reminder'
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? '/api'
 
@@ -117,6 +118,22 @@ export const translatorActivityApi = {
     })
   },
 
+  async finish(activityId: number): Promise<ActivityDetail> {
+    const csrfToken = await csrf()
+    return request<ActivityDetail>(`/v1/translator/activities/${activityId}/finish`, {
+      method: 'POST',
+      headers: { [csrfToken.headerName]: csrfToken.token },
+    })
+  },
+
+  async submitForChecking(activityId: number): Promise<ActivityDetail> {
+    const csrfToken = await csrf()
+    return request<ActivityDetail>(`/v1/translator/activities/${activityId}/submit-for-checking`, {
+      method: 'POST',
+      headers: { [csrfToken.headerName]: csrfToken.token },
+    })
+  },
+
   async createWorkRecord(activityId: number, payload: CreateWorkRecordPayload): Promise<ActivityDetail> {
     const csrfToken = await csrf()
     return request<ActivityDetail>(`/v1/translator/activities/${activityId}/work-records`, {
@@ -136,6 +153,20 @@ export const translatorActivityApi = {
       method: 'PUT',
       headers: { [csrfToken.headerName]: csrfToken.token },
       body: JSON.stringify(payload),
+    })
+  },
+}
+
+export const reminderApi = {
+  list(): Promise<{ reminders: Reminder[] }> {
+    return request<{ reminders: Reminder[] }>('/v1/translator/reminders')
+  },
+
+  async markRead(reminderId: number): Promise<void> {
+    const csrfToken = await csrf()
+    await request<void>(`/v1/translator/reminders/${reminderId}/read`, {
+      method: 'PATCH',
+      headers: { [csrfToken.headerName]: csrfToken.token },
     })
   },
 }

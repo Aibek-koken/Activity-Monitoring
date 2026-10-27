@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
-import { AlertCircle, ClipboardList, RefreshCw, Search, SlidersHorizontal } from 'lucide-react'
+import { AlertCircle, Bell, ChevronDown, ClipboardList, RefreshCw, Search, SlidersHorizontal } from 'lucide-react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { Breadcrumbs } from '../components/Breadcrumbs'
 import { WorkspaceLayout } from '../components/WorkspaceLayout'
 import { activityStatusLabels, formatDate, formatVolume, statusClassName } from '../lib/activity-format'
-import { translatorActivityApi } from '../lib/api'
+import { reminderApi, translatorActivityApi } from '../lib/api'
 import type { ActivityStatus, ActivitySummary } from '../types/activity'
+import type { Reminder } from '../types/reminder'
 
 function dateParam(value: string | null): string {
   return value && /^\d{4}-\d{2}-\d{2}$/.test(value) && !Number.isNaN(Date.parse(`${value}T00:00:00Z`))
@@ -37,6 +38,10 @@ export function TranslatorActivitiesPage() {
   const detailSearch = listSearch.toString()
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [reminders, setReminders] = useState<Reminder[]>([])
+  const [reminderError, setReminderError] = useState<string | null>(null)
+  const [readingReminderId, setReadingReminderId] = useState<number | null>(null)
+  const [isRemindersOpen, setIsRemindersOpen] = useState(false)
   const [isFilterOpen, setIsFilterOpen] = useState(false)
   const [draftStatus, setDraftStatus] = useState<ActivityStatus | ''>('')
   const [draftFrom, setDraftFrom] = useState('')
@@ -64,6 +69,34 @@ export function TranslatorActivitiesPage() {
     }, 220)
     return () => window.clearTimeout(handle)
   }, [loadActivities, query])
+
+  const loadReminders = useCallback(async () => {
+    try {
+      const response = await reminderApi.list()
+      setReminders(response.reminders)
+      setReminderError(null)
+    } catch {
+      setReminderError('Reminders could not be loaded.')
+    }
+  }, [])
+
+  useEffect(() => {
+    void loadReminders()
+  }, [loadReminders])
+
+  const markReminderRead = async (reminderId: number) => {
+    if (readingReminderId !== null) return
+    setReadingReminderId(reminderId)
+    setReminderError(null)
+    try {
+      await reminderApi.markRead(reminderId)
+      setReminders((current) => current.filter((reminder) => reminder.id !== reminderId))
+    } catch {
+      setReminderError('Reminder could not be marked read. Try again.')
+    } finally {
+      setReadingReminderId(null)
+    }
+  }
 
   useEffect(() => {
     if (!isFilterOpen) return
@@ -162,6 +195,57 @@ export function TranslatorActivitiesPage() {
         <header className="translator-hero">
           <h1>Assigned activities</h1>
         </header>
+
+        {(reminders.length > 0 || reminderError) && (
+          <section className="reminder-region" aria-labelledby="reminder-title">
+            <button aria-controls="reminder-content" aria-expanded={isRemindersOpen} className="reminder-region__toggle"
+              onClick={() => setIsRemindersOpen((open) => !open)} type="button">
+              <span className="reminder-region__heading"><Bell size={18} aria-hidden="true" />
+                <span id="reminder-title">{reminderError ? 'Reminders unavailable' : `${reminders.length} ${reminders.length === 1 ? 'reminder' : 'reminders'}`}</span>
+              </span>
+              <ChevronDown aria-hidden="true" className={isRemindersOpen ? 'history-disclosure__chevron history-disclosure__chevron--open' : 'history-disclosure__chevron'} size={17} />
+            </button>
+            <div className="reminder-region__content" hidden={!isRemindersOpen} id="reminder-content">
+            {reminderError && (
+              <div className="reminder-region__error" role="alert">
+                <span>{reminderError}</span>
+                <button className="button button--ghost button--compact" onClick={() => void loadReminders()} type="button">Retry</button>
+              </div>
+            )}
+            {reminders.some((reminder) => reminder.type === 'DAILY_RECORD_REMINDER') && (
+              <ul className="reminder-region__list" aria-label="Daily reminders">
+                {reminders.filter((reminder) => reminder.type === 'DAILY_RECORD_REMINDER').map((reminder) => (
+                  <li key={reminder.id}>
+                    <Link to="/translator">{reminder.message}</Link>
+                    <button className="button button--ghost button--compact" disabled={readingReminderId === reminder.id}
+                      onClick={() => void markReminderRead(reminder.id)} type="button" aria-label="Mark daily reminder read">
+                      Mark read
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+            {reminders.some((reminder) => reminder.type === 'WEEKLY_ESTIMATE_REMINDER') && (
+              <div className="reminder-region__weekly">
+                <h3>Weekly estimates</h3>
+                <ul className="reminder-region__list" aria-label="Weekly reminders">
+                  {reminders.filter((reminder) => reminder.type === 'WEEKLY_ESTIMATE_REMINDER').map((reminder) => (
+                    <li key={reminder.id}>
+                      <Link to={reminder.activityId ? `/translator/activities/${reminder.activityId}${detailSearch ? `?${detailSearch}` : ''}#weekly-estimate` : '/translator'}>
+                        {reminder.message}
+                      </Link>
+                      <button className="button button--ghost button--compact" disabled={readingReminderId === reminder.id}
+                        onClick={() => void markReminderRead(reminder.id)} type="button" aria-label={`Mark reminder for ${reminder.activityNumber ?? 'activity'} read`}>
+                        Mark read
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            </div>
+          </section>
+        )}
 
         <section className="activity-toolbar" aria-label="Filter assigned activities" ref={filterToolbarRef}>
           <label className="search-field" htmlFor="activity-search">
@@ -287,8 +371,8 @@ export function TranslatorActivitiesPage() {
                   <span>{activity.responsible ? 'Responsible' : 'Assisting'}</span>
                 </span>
                 <span className="activity-row__progress">
-                  <strong>{formatVolume(activity.progress.totalTranslatedVolume)}</strong>
-                  <span>{formatDate(activity.progress.lastRecordDate)}</span>
+                  <strong>{formatVolume(activity.progress.totalTranslatedVolume)} units</strong>
+                  <span>Logged by you · {formatDate(activity.progress.lastRecordDate)}</span>
                 </span>
               </Link>
             ))}

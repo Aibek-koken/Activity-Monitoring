@@ -170,3 +170,34 @@ X-XSRF-TOKEN:
 
 ### 23. Manager tries translator API: should fail
 GET {{baseUrl}}/v1/translator/activities
+
+
+### 24. Save zero for the current week before finishing (responsible translator)
+### Log in as translator again and obtain a fresh CSRF token first.
+PUT {{baseUrl}}/v1/translator/activities/{{activityId}}/weekly-estimates/current
+Content-Type: application/json
+X-XSRF-TOKEN: ВСТАВЬ_CSRF_TOKEN_ИЗ_ПРЕДЫДУЩЕГО_ОТВЕТА
+
+{
+  "remainingTextVolume": 0
+}
+
+
+### 25. Finish activity; daily records and estimates become read-only
+POST {{baseUrl}}/v1/translator/activities/{{activityId}}/finish
+X-XSRF-TOKEN: ВСТАВЬ_CSRF_TOKEN_ИЗ_ПРЕДЫДУЩЕГО_ОТВЕТА
+
+
+### 26. Submit for Chief Editor checking; creates Review cycle 1
+POST {{baseUrl}}/v1/translator/activities/{{activityId}}/submit-for-checking
+X-XSRF-TOKEN: ВСТАВЬ_CSRF_TOKEN_ИЗ_ПРЕДЫДУЩЕГО_ОТВЕТА
+
+
+### 27. List unread, still-relevant reminders
+GET {{baseUrl}}/v1/translator/reminders
+
+
+### 28. Mark one of your reminders read (copy its id from request 27)
+@reminderId = 1
+PATCH {{baseUrl}}/v1/translator/reminders/{{reminderId}}/read
+X-XSRF-TOKEN: ВСТАВЬ_CSRF_TOKEN_ИЗ_ПРЕДЫДУЩЕГО_ОТВЕТА

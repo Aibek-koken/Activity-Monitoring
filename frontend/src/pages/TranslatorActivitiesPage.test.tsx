@@ -1,7 +1,7 @@
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { translatorActivityApi } from '../lib/api'
+import { reminderApi, translatorActivityApi } from '../lib/api'
 import type { ActivitySummary } from '../types/activity'
 import { TranslatorActivitiesPage } from './TranslatorActivitiesPage'
 
@@ -19,6 +19,10 @@ vi.mock('../auth/AuthContext', () => ({
 }))
 
 vi.mock('../lib/api', () => ({
+  reminderApi: {
+    list: vi.fn(),
+    markRead: vi.fn(),
+  },
   translatorActivityApi: {
     list: vi.fn(),
   },
@@ -59,6 +63,10 @@ describe('TranslatorActivitiesPage', () => {
   beforeEach(() => {
     vi.useFakeTimers()
     vi.mocked(translatorActivityApi.list).mockReset()
+    vi.mocked(reminderApi.list).mockReset()
+    vi.mocked(reminderApi.list).mockResolvedValue({ reminders: [] })
+    vi.mocked(reminderApi.markRead).mockReset()
+    vi.mocked(reminderApi.markRead).mockResolvedValue(undefined)
   })
 
   afterEach(() => {
@@ -82,8 +90,43 @@ describe('TranslatorActivitiesPage', () => {
 
     expect(screen.getByText('Privacy policy translation')).toBeInTheDocument()
     expect(screen.getByText('EL-2026-001')).toBeInTheDocument()
-    expect(screen.getAllByText('20.75')).toHaveLength(1)
+    expect(screen.getAllByText('20.75 units')).toHaveLength(1)
+    expect(screen.getByText(/Logged by you/)).toBeInTheDocument()
     expect(screen.queryByText('Shown')).not.toBeInTheDocument()
+  })
+
+  it('shows daily and grouped weekly reminders with links and read actions', async () => {
+    vi.mocked(translatorActivityApi.list).mockResolvedValue({ activities: assignedActivities })
+    vi.mocked(reminderApi.list).mockResolvedValue({ reminders: [
+      { id: 1, type: 'DAILY_RECORD_REMINDER', periodDate: '2026-10-23', message: "Record today's translated volume.", createdAt: '2026-10-23T13:00:00Z' },
+      { id: 2, type: 'WEEKLY_ESTIMATE_REMINDER', periodDate: '2026-10-19', message: 'Add an estimate for EL-2026-001.', activityId: 101, activityNumber: 'EL-2026-001', createdAt: '2026-10-23T13:00:00Z' },
+      { id: 3, type: 'WEEKLY_ESTIMATE_REMINDER', periodDate: '2026-10-19', message: 'Add an estimate for EL-2026-002.', activityId: 102, activityNumber: 'EL-2026-002', createdAt: '2026-10-23T13:00:00Z' },
+    ] })
+
+    renderPage('/translator?assignment=responsible')
+    await runDebouncedLoad()
+    expect(screen.getByRole('button', { name: '3 reminders' })).toHaveAttribute('aria-expanded', 'false')
+    fireEvent.click(screen.getByRole('button', { name: '3 reminders' }))
+    expect(screen.getByRole('heading', { name: 'Weekly estimates' })).toBeInTheDocument()
+    expect(screen.getByText("Record today's translated volume.").closest('a')).toHaveAttribute('href', '/translator')
+    expect(screen.getByText('Add an estimate for EL-2026-001.').closest('a')).toHaveAttribute('href', '/translator/activities/101?assignment=responsible#weekly-estimate')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Mark reminder for EL-2026-001 read' }))
+    await act(async () => {})
+    expect(reminderApi.markRead).toHaveBeenCalledWith(2)
+    expect(screen.queryByText('Add an estimate for EL-2026-001.')).not.toBeInTheDocument()
+    expect(screen.getByText('Add an estimate for EL-2026-002.')).toBeInTheDocument()
+  })
+
+  it('keeps the activity list usable when reminders fail to load', async () => {
+    vi.mocked(translatorActivityApi.list).mockResolvedValue({ activities: assignedActivities })
+    vi.mocked(reminderApi.list).mockRejectedValue(new Error('offline'))
+
+    renderPage()
+    await runDebouncedLoad()
+    expect(screen.getByText('Privacy policy translation')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Reminders unavailable' }))
+    expect(screen.getByRole('alert')).toHaveTextContent('Reminders could not be loaded.')
   })
 
   it('shows an empty state when no activities are assigned', async () => {

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { AlertCircle, ChevronDown, ClipboardList, Pencil, Plus, RefreshCw, Save } from 'lucide-react'
 import { useLocation, useParams } from 'react-router-dom'
 import { Breadcrumbs } from '../components/Breadcrumbs'
@@ -71,7 +71,15 @@ export function TranslatorActivityDetailPage() {
   const [estimateError, setEstimateError] = useState<string | null>(null)
   const [estimateSuccess, setEstimateSuccess] = useState<string | null>(null)
   const [isEstimateSaving, setIsEstimateSaving] = useState(false)
+  const [isEstimateOpen, setIsEstimateOpen] = useState(location.hash === '#weekly-estimate')
+  const estimateInputRef = useRef<HTMLInputElement>(null)
+  const focusEstimateOnOpenRef = useRef(false)
   const [isEstimateHistoryOpen, setIsEstimateHistoryOpen] = useState(false)
+  const [isFinishConfirming, setIsFinishConfirming] = useState(false)
+  const [isLifecycleSaving, setIsLifecycleSaving] = useState(false)
+  const [lifecycleError, setLifecycleError] = useState<string | null>(null)
+  const [lifecycleSuccess, setLifecycleSuccess] = useState<string | null>(null)
+  const loadedActivityId = activity?.id
   const todayLocal = todayLocalDateString()
   const latestAllowedDate = latestAllowedRecordDateString()
   const workRecords = useMemo(() => activity?.workRecords ?? [], [activity?.workRecords])
@@ -141,6 +149,16 @@ export function TranslatorActivityDetailPage() {
   }, [loadActivity])
 
   useEffect(() => {
+    if (location.hash === '#weekly-estimate') setIsEstimateOpen(true)
+  }, [location.hash])
+
+  useEffect(() => {
+    if (loadedActivityId && location.hash === '#weekly-estimate') {
+      document.getElementById('weekly-estimate')?.scrollIntoView?.({ block: 'start' })
+    }
+  }, [loadedActivityId, location.hash])
+
+  useEffect(() => {
     if (!activity) return
 
     setEstimateValue(activity.currentWeekEstimate == null
@@ -159,6 +177,22 @@ export function TranslatorActivityDetailPage() {
     setFieldErrors({})
     setFormError(null)
   }, [activity, todayRecord, todayLocal])
+
+  useEffect(() => {
+    if (isEstimateOpen && focusEstimateOnOpenRef.current) {
+      estimateInputRef.current?.focus()
+      focusEstimateOnOpenRef.current = false
+    }
+  }, [isEstimateOpen])
+
+  const openEstimateForFinish = () => {
+    if (isEstimateOpen) {
+      estimateInputRef.current?.focus()
+      return
+    }
+    focusEstimateOnOpenRef.current = true
+    setIsEstimateOpen(true)
+  }
 
   const clearFieldError = (field: keyof RecordFieldErrors) => {
     setFieldErrors((current) => {
@@ -252,6 +286,30 @@ export function TranslatorActivityDetailPage() {
     }
   }
 
+  const handleLifecycleAction = async (action: 'finish' | 'submit') => {
+    if (!activity || isLifecycleSaving) return
+    setIsLifecycleSaving(true)
+    setLifecycleError(null)
+    setLifecycleSuccess(null)
+    try {
+      const updated = action === 'finish'
+        ? await translatorActivityApi.finish(activity.id)
+        : await translatorActivityApi.submitForChecking(activity.id)
+      setActivity(updated)
+      setIsFinishConfirming(false)
+      setLifecycleSuccess(action === 'finish' ? 'Activity finished.' : 'Activity submitted for checking.')
+    } catch (actionError) {
+      setLifecycleError(actionError instanceof ApiError
+        ? actionError.message
+        : 'The activity could not be updated. Try again.')
+      if (actionError instanceof ApiError && actionError.status === 409) {
+        await loadActivity()
+      }
+    } finally {
+      setIsLifecycleSaving(false)
+    }
+  }
+
   return (
     <WorkspaceLayout
       navItems={[{
@@ -294,125 +352,30 @@ export function TranslatorActivityDetailPage() {
           <>
             <header className="activity-detail">
               <div>
-                <span className={statusClassName(activity.status)}>
-                  {activityStatusLabels[activity.status]}
-                </span>
+                <div className="activity-detail__context">
+                  <span>{activity.activityNumber}</span>
+                  <span className={statusClassName(activity.status)}>{activityStatusLabels[activity.status]}</span>
+                  <span>{activity.responsible ? 'Responsible' : 'Assisting'}</span>
+                </div>
                 <h1>{activity.activityName}</h1>
                 <p>{activity.projectName}</p>
               </div>
-              <div className="activity-detail__number">
-                <span>Number</span>
-                <strong>{activity.activityNumber}</strong>
-              </div>
             </header>
 
-            <dl className="detail-grid" aria-label="Activity progress">
-              <div>
-                <dt>Translated</dt>
-                <dd>{formatVolume(activity.progress.totalTranslatedVolume)}</dd>
-              </div>
-              <div>
-                <dt>Daily records</dt>
-                <dd>{activity.progress.recordCount}</dd>
-              </div>
-              <div>
-                <dt>Last record</dt>
-                <dd>{formatDate(activity.progress.lastRecordDate)}</dd>
-              </div>
-              <div>
-                <dt>Assigned</dt>
-                <dd>{formatDate(activity.assignedDate)}</dd>
-              </div>
-            </dl>
-
-            <section className="work-record-panel estimate-panel" aria-labelledby="estimate-title">
-              <div className="section-heading">
-                <div>
-                  <h2 id="estimate-title">Weekly remaining</h2>
-                  <p>
-                    {activity.currentWeek
-                      ? `${formatDate(activity.currentWeek.startDate)} – ${formatDate(activity.currentWeek.endDate)}`
-                      : 'Current week'}
-                  </p>
-                </div>
-                {activity.currentWeekEstimate && (
-                  <strong className="estimate-panel__current">
-                    {formatVolume(activity.currentWeekEstimate.remainingTextVolume)} units remaining
-                  </strong>
-                )}
-              </div>
-
-              {activity.permissions?.canEditWeeklyEstimate ? (
-                <form className="estimate-form" noValidate onSubmit={(event) => void handleEstimateSubmit(event)}>
-                  <div className="field-group">
-                    <label htmlFor="remaining-volume">Remaining volume (units)</label>
-                    <input
-                      aria-describedby={estimateError ? 'estimate-error' : undefined}
-                      aria-invalid={estimateError ? 'true' : 'false'}
-                      disabled={isEstimateSaving}
-                      id="remaining-volume"
-                      inputMode="decimal"
-                      onChange={(event) => {
-                        setEstimateValue(event.target.value)
-                        setEstimateError(null)
-                        setEstimateSuccess(null)
-                      }}
-                      placeholder="0.00"
-                      type="text"
-                      value={estimateValue}
-                    />
-                  </div>
-                  <button className="button button--primary" disabled={isEstimateSaving} type="submit">
-                    <Save size={17} aria-hidden="true" />
-                    {isEstimateSaving ? 'Saving…' : 'Save estimate'}
-                  </button>
-                </form>
-              ) : (
-                <p className="estimate-panel__note">
-                  {activity.responsible
-                    ? 'The estimate is read-only in this activity status.'
-                    : 'Only the responsible translator can update this estimate.'}
-                </p>
-              )}
-              {estimateError && <p className="form-alert" id="estimate-error" role="alert">{estimateError}</p>}
-              {estimateSuccess && <p aria-live="polite" className="form-success" role="status">{estimateSuccess}</p>}
-
-              <div className="estimate-history">
-                <button
-                  aria-controls="estimate-history-content"
-                  aria-expanded={isEstimateHistoryOpen}
-                  className="button button--ghost button--compact"
-                  onClick={() => setIsEstimateHistoryOpen((open) => !open)}
-                  type="button"
-                >
-                  {isEstimateHistoryOpen ? 'Hide estimate history' : 'Show estimate history'}
-                  <ChevronDown aria-hidden="true" className={isEstimateHistoryOpen ? 'history-disclosure__chevron history-disclosure__chevron--open' : 'history-disclosure__chevron'} size={17} />
-                </button>
-                <div hidden={!isEstimateHistoryOpen} id="estimate-history-content">
-                  {(activity.weeklyEstimates ?? []).length === 0 ? (
-                    <p className="estimate-panel__note">No weekly estimates yet.</p>
-                  ) : (
-                    <ul className="estimate-history__list">
-                      {(activity.weeklyEstimates ?? []).map((estimate) => (
-                        <li key={estimate.id}>
-                          <span>Week of {formatDate(estimate.weekStartDate)}</span>
-                          <strong>{formatVolume(estimate.remainingTextVolume)} units</strong>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
-              </div>
-            </section>
+            <p className="activity-detail__summary">
+              <span><strong>{formatVolume(activity.progress.totalTranslatedVolume)} units</strong> logged by you</span>
+              <span>{activity.progress.recordCount} daily {activity.progress.recordCount === 1 ? 'record' : 'records'}</span>
+              {activity.progress.lastRecordDate && <span>Last entry {formatDate(activity.progress.lastRecordDate)}</span>}
+            </p>
 
             {activity.permissions?.canEditWorkRecords && <section className="work-record-panel" aria-labelledby="record-form-title">
               <div className="section-heading">
                 <div>
-                  <h2 id="record-form-title">{editingRecord ? 'Edit daily record' : 'Record translated volume'}</h2>
+                  <h2 id="record-form-title">{editingRecord ? 'Edit daily record' : 'Record daily work'}</h2>
                   <p>
                     {editingRecord
                       ? `You are editing ${formatDate(editingRecord.recordDate)}. The date stays locked; change the volume or hours only.`
-                      : 'Choose today or a past date. Future dates are blocked.'}
+                      : 'Log the units you translated on this date. You can choose a past date.'}
                   </p>
                 </div>
                 {editingRecord && (
@@ -527,6 +490,162 @@ export function TranslatorActivityDetailPage() {
               {formError && <p className="form-alert" role="alert">{formError}</p>}
               {formSuccess && <p aria-live="polite" className="form-success" role="status">{formSuccess}</p>}
             </section>}
+
+            {activity.permissions?.canEditWeeklyEstimate && !activity.permissions.canFinish && (
+              <section className="next-step-panel" aria-labelledby="finish-guide-title">
+                <div>
+                  <h2 id="finish-guide-title">When the translation is done</h2>
+                  <p>Daily records track work already done. When no text remains, report 0 units remaining, then finish the activity.</p>
+                </div>
+                <button className="button button--secondary button--compact" onClick={openEstimateForFinish} type="button">
+                  Update remaining estimate
+                </button>
+              </section>
+            )}
+
+            {activity.permissions?.canFinish && (
+              <section className="next-step-panel next-step-panel--ready lifecycle-panel" aria-labelledby="finish-title">
+                <div className="section-heading">
+                  <div>
+                    <h2 id="finish-title">Translation ready to finish</h2>
+                    <p>You reported 0 units remaining. Finish when all translation work is recorded.</p>
+                  </div>
+                  {!isFinishConfirming && (
+                    <button className="button button--primary" disabled={isLifecycleSaving} onClick={() => setIsFinishConfirming(true)} type="button">
+                      Finish translation
+                    </button>
+                  )}
+                </div>
+                {isFinishConfirming && (
+                  <div className="lifecycle-panel__confirmation" role="group" aria-label="Confirm finish activity">
+                    <p>Finishing locks daily records and weekly estimates. You can then submit the activity for checking.</p>
+                    <div className="lifecycle-panel__actions">
+                      <button className="button button--primary" disabled={isLifecycleSaving} onClick={() => void handleLifecycleAction('finish')} type="button">
+                        {isLifecycleSaving ? 'Finishing…' : 'Confirm finish'}
+                      </button>
+                      <button className="button button--secondary" disabled={isLifecycleSaving} onClick={() => setIsFinishConfirming(false)} type="button">
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </section>
+            )}
+
+            {activity.permissions?.canSubmitForChecking && (
+              <section className="next-step-panel next-step-panel--ready lifecycle-panel" aria-labelledby="submit-title">
+                <div className="section-heading">
+                  <div>
+                    <h2 id="submit-title">Ready for checking</h2>
+                    <p>Records are locked. Send this activity to the responsible Chief Editor.</p>
+                  </div>
+                  <button className="button button--primary" disabled={isLifecycleSaving} onClick={() => void handleLifecycleAction('submit')} type="button">
+                    {isLifecycleSaving ? 'Submitting…' : 'Submit for checking'}
+                  </button>
+                </div>
+              </section>
+            )}
+
+            {activity.status === 'UNDER_CHECKING' && (
+              <section className="next-step-panel lifecycle-panel" aria-labelledby="under-checking-title">
+                <div className="section-heading">
+                  <div>
+                    <h2 id="under-checking-title">Under checking</h2>
+                    <p>The activity is with the Chief Editor. Daily records and estimates are read-only.</p>
+                  </div>
+                </div>
+              </section>
+            )}
+
+            {lifecycleError && <p className="form-alert" role="alert">{lifecycleError}</p>}
+            {lifecycleSuccess && <p aria-live="polite" className="form-success" role="status">{lifecycleSuccess}</p>}
+
+            <section className="estimate-disclosure" aria-labelledby="estimate-title" id="weekly-estimate">
+              <button
+                aria-controls="estimate-content"
+                aria-expanded={isEstimateOpen}
+                className="estimate-disclosure__toggle"
+                onClick={() => setIsEstimateOpen((open) => !open)}
+                type="button"
+              >
+                <span>
+                  <span className="estimate-disclosure__title" id="estimate-title">Weekly remaining estimate</span>
+                  <span className="estimate-disclosure__caption">{activity.currentWeek
+                    ? `${formatDate(activity.currentWeek.startDate)} – ${formatDate(activity.currentWeek.endDate)}`
+                    : 'Current week'}</span>
+                </span>
+                <span className="estimate-disclosure__right">
+                  <strong>{activity.currentWeekEstimate
+                    ? `${formatVolume(activity.currentWeekEstimate.remainingTextVolume)} units left`
+                    : 'No estimate yet'}</strong>
+                  <ChevronDown aria-hidden="true" className={isEstimateOpen ? 'history-disclosure__chevron history-disclosure__chevron--open' : 'history-disclosure__chevron'} size={18} />
+                </span>
+              </button>
+              <div className="estimate-disclosure__content" hidden={!isEstimateOpen} id="estimate-content">
+                {activity.permissions?.canEditWeeklyEstimate ? (
+                  <>
+                    <p className="estimate-panel__note">Estimate the text still left in this activity. This is separate from your daily work record.</p>
+                    <form className="estimate-form" noValidate onSubmit={(event) => void handleEstimateSubmit(event)}>
+                      <div className="field-group">
+                        <label htmlFor="remaining-volume">Remaining volume (units)</label>
+                        <input
+                          aria-describedby={estimateError ? 'estimate-error' : undefined}
+                          aria-invalid={estimateError ? 'true' : 'false'}
+                          disabled={isEstimateSaving}
+                          id="remaining-volume"
+                          inputMode="decimal"
+                          ref={estimateInputRef}
+                          onChange={(event) => {
+                            setEstimateValue(event.target.value)
+                            setEstimateError(null)
+                            setEstimateSuccess(null)
+                          }}
+                          placeholder="0.00"
+                          type="text"
+                          value={estimateValue}
+                        />
+                      </div>
+                      <button className="button button--secondary" disabled={isEstimateSaving} type="submit">
+                        <Save size={17} aria-hidden="true" />
+                        {isEstimateSaving ? 'Saving…' : 'Save estimate'}
+                      </button>
+                    </form>
+                  </>
+                ) : (
+                  <p className="estimate-panel__note">{activity.responsible
+                    ? 'This estimate is read-only after finishing.'
+                    : 'Only the responsible translator can update this estimate.'}</p>
+                )}
+                {estimateError && <p className="form-alert" id="estimate-error" role="alert">{estimateError}</p>}
+                {estimateSuccess && <p aria-live="polite" className="form-success" role="status">{estimateSuccess}</p>}
+                <div className="estimate-history">
+                  <button
+                    aria-controls="estimate-history-content"
+                    aria-expanded={isEstimateHistoryOpen}
+                    className="button button--ghost button--compact"
+                    onClick={() => setIsEstimateHistoryOpen((open) => !open)}
+                    type="button"
+                  >
+                    {isEstimateHistoryOpen ? 'Hide estimate history' : 'Show estimate history'}
+                    <ChevronDown aria-hidden="true" className={isEstimateHistoryOpen ? 'history-disclosure__chevron history-disclosure__chevron--open' : 'history-disclosure__chevron'} size={17} />
+                  </button>
+                  <div hidden={!isEstimateHistoryOpen} id="estimate-history-content">
+                    {(activity.weeklyEstimates ?? []).length === 0 ? (
+                      <p className="estimate-panel__note">No weekly estimates yet.</p>
+                    ) : (
+                      <ul className="estimate-history__list">
+                        {(activity.weeklyEstimates ?? []).map((estimate) => (
+                          <li key={estimate.id}>
+                            <span>Week of {formatDate(estimate.weekStartDate)}</span>
+                            <strong>{formatVolume(estimate.remainingTextVolume)} units</strong>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </section>
 
             <section className="record-section" aria-labelledby="history-title">
               <div className="history-disclosure">

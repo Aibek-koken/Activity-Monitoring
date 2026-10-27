@@ -1,6 +1,6 @@
 # Architecture
 
-Last updated: 2026-10-22
+Last updated: 2026-10-25
 
 ## Project Map
 
@@ -14,13 +14,13 @@ Last updated: 2026-10-22
 
 The backend is a layered modular monolith:
 
-- `controller` exposes auth/workspace checks and translator activity/work-record endpoints.
-- `service` handles auth and translator activity use cases, including assignment checks, record validation, progress responses, and the Sprint 3 weekly-estimate upsert.
-- `repository` owns JPA access to users, projects, activities, assignments, and work records.
-- `model` contains users/roles and the Sprint 2 activity domain.
+- `controller` exposes auth/workspace checks, translator activity/record/estimate/lifecycle endpoints, and reminder endpoints.
+- `service` handles auth, translator activity use cases, weekly estimates, finish/submission, and reminder evaluation.
+- `repository` owns JPA access to users, projects, activities, assignments, work records, estimates, reviews, and notifications.
+- `model` contains users/roles, activities, assignments, records, estimates, reviews, and notifications.
 - `dto` contains request/response records.
 - `security` contains the authenticated principal and JWT filter.
-- `config` wires Spring Security, CORS, password hashing, CSRF, JWT filter registration, and non-production demo seeding.
+- `config` wires Spring Security, CORS, password hashing, CSRF, JWT filter registration, business time, reminder scheduling, and non-production demo seeding.
 - `common` contains JSON error shapes and exception/security error writers.
 
 Controllers call services; services use repositories; repositories work with models. Controllers should not query repositories directly.
@@ -32,7 +32,7 @@ Controllers call services; services use repositories; repositories work with mod
 - `lib/api.ts` is the HTTP boundary; it sends cookies and CSRF headers.
 - `lib/roles.ts` maps backend roles to labels and routes.
 - `pages/` contains landing/login, the translator list and detail screens, starter editor/manager workspaces, and 404.
-- `types/activity.ts` defines translator activity API shapes; `lib/activity-format.ts` and `lib/validation.ts` support display and form validation.
+- `types/activity.ts` and `types/reminder.ts` define translator API shapes; `lib/activity-format.ts` and `lib/validation.ts` support display and form validation.
 - `styles.css` holds shared product styling; `landing.css` holds landing-page styling.
 
 ## Data And Auth Flow
@@ -54,6 +54,12 @@ There is no self-registration flow in the current application.
 3. `POST`/`PUT` work-record endpoints validate the signed-in translator's assignment and data. The database enforces one record per translator/activity/date; creating the first record moves `ASSIGNED` to `IN_PROGRESS`.
 4. The history date range only changes which records the page displays. It does not change the server's cumulative total or the record form.
 
-## Sprint 3 In Progress
+## Sprint 3 Progress, Submission, And Reminders
 
-V4 and the weekly-estimate slice are implemented. `TranslatorProgressService` locks the activity row, verifies the responsible assignment, and creates or updates the server-calculated current-week estimate. `TranslatorActivityService` includes estimate history and permissions in detail responses; record writes use the same row lock and reject states after `IN_PROGRESS`. `BusinessTimeConfig` supplies a configurable `Clock` defaulting to `Asia/Almaty`. The UI shows the estimate and collapsed history on the existing detail page. Review and notification tables are present, but finish, submission, reminder scheduling, and reminder APIs remain to be implemented. See `SPRINT_3_PLAN.md` for the remaining stages.
+`TranslatorProgressService` locks the activity row for current-week estimate upserts, Finish, and Submit. It verifies the responsible assignment and active state. Finish requires a saved zero estimate for the current Monday–Sunday week; Submit requires `FINISHED` and an active responsible Chief Editor for the project. Review cycle 1 and the `UNDER_CHECKING` transition commit in one transaction. The row lock and database uniqueness protect against simultaneous writes and duplicate reviews.
+
+`TranslatorActivityService` includes estimate history and server-computed action permissions in detail responses. It uses the same activity lock for record writes and rejects writes after `IN_PROGRESS`. Assistants can view estimates but cannot change the authoritative value or transition the activity.
+
+`BusinessTimeConfig` supplies an injectable `Clock` defaulting to `Asia/Almaty`. `ReminderScheduler` evaluates due work hourly and on startup. `ReminderService` queries due assignments in batches, checks daily records and current-week estimates, and inserts persisted notifications through `NotificationWriter` with a separate transaction. The notification dedupe key handles concurrent scheduler runs. The reminder API returns only unread reminders whose day/week, assignment, and missing work are still relevant. It marks only the owning user's reminder read.
+
+The React activity list summarizes reminders in a disclosure, with direct links and read actions when expanded. The detail page prioritizes the daily record form, gives the responsible translator a next-step explanation, and keeps the weekly estimate and its history collapsed by default. Zero remaining exposes an explicit Finish confirmation; Submit appears only in `FINISHED`. After submission, the work forms are replaced by the `UNDER_CHECKING` state. The backend remains authoritative for permissions and transitions.

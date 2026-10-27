@@ -1,26 +1,26 @@
 # State
 
-Last updated: 2026-10-22
+Last updated: 2026-10-25
 
 ## Current Summary
 
-Sprint 1 is complete locally: database-backed login, cookie JWT auth, CSRF, role-based protected workspaces, demo users, logout, and a public landing page. Sprint 2 is complete locally: translators can load/search/open assigned activities, see cumulative translated-volume progress, and create or edit daily work records. The translator UI has breadcrumbs, assignment-role and optional status/assigned-date filters, and a collapsible daily history with an inclusive date-range filter. Sprint 3 implementation has begun: the V4 schema and current-week remaining-volume estimate flow are present.
+Sprints 1–3 are complete locally. Sprint 1 provides database-backed login, cookie JWT auth, CSRF, role-based protected workspaces, demo users, logout, and a public landing page. Sprint 2 lets translators load/search/open assignments, see cumulative translated volume, and create or edit daily records; its UI has breadcrumbs and compact filters/histories. Sprint 3 adds weekly remaining-volume estimates, daily/weekly in-app reminders, explicit zero-remaining Finish, and submission for Chief Editor checking with one Review cycle.
 
 ## In Progress
 
-- Sprint 3 Stage 0/1 and the first US-09 vertical slice are implemented. The responsible translator can save/update one current-week estimate per activity; assigned assistants can read it; the detail page shows current value and collapsed history. The plan's product defaults are recorded in `DECISIONS.md`.
+- No incomplete Sprint 3 story remains. The next implementation stage is Sprint 4 Chief Editor checking; its workflow has not been started.
 
 ## Next Priorities
 
-- Complete Sprint 3 with zero-remaining `FINISHED` and submission for checking (US-11/US-12), then daily/weekly reminders (US-08/US-10). Add fixed-clock/concurrency and E2E coverage for the remaining flows, then close Sprint 3 only when Definition of Done passes.
-- Leave editor checking/corrections for Sprint 4 and manager activity creation/assignment for Sprint 5. When manager assignment is built, enforce separate quotas of 5 active responsible and 10 active assisting assignments on the backend.
+- Plan and implement Sprint 4 Chief Editor checking, result, and corrections against the Review cycle created by Sprint 3 submission.
+- Leave manager activity creation/assignment for Sprint 5. When manager assignment is built, enforce separate quotas of 5 active responsible and 10 active assisting assignments on the backend.
 
 ## Known Bugs And Risks
 
 - Open question: the ERD defines `TranslatedVolume` as a float but does not name a real-world unit such as pages, words, or characters; the UI labels it as translated volume units until the domain unit is clarified.
 - Production settings still need a real JWT secret, secure cookies over HTTPS, narrowed CORS origins, and demo seeding disabled.
 - The separate 5 responsible + 10 assisting active-assignment limits are documented future requirements, not enforced by the current demo seeding or an assignment API.
-- The original six-sprint overview and master user-story file referenced in `PROJECT_CONTEXT.md` are not present in this workspace. Sprint 3's working scope is cross-checked against available sources; the working reminder schedule and estimate ownership are now recorded project decisions.
+- The original six-sprint overview and master user-story file referenced in `PROJECT_CONTEXT.md` are not present in this workspace. Sprint 3's scope was cross-checked against available design sources; reminder schedule and estimate ownership are recorded project decisions.
 
 ## Decisions Made
 
@@ -31,6 +31,9 @@ Sprint 1 is complete locally: database-backed login, cookie JWT auth, CSRF, role
 
 ## Last Session
 
+- 2026-10-25: Applied the user-selected Lokalise task hierarchy to the translator UI: daily work is first, Finish/Submit has a visible next step, weekly estimation and reminders are secondary disclosures, weekly reminder links open the estimate directly, and volume is labeled as personal recorded work. Stored Lokalise as the current reference and Smartcat/Phrase as future references in `DESIGN.md`. No backend rule or schema changed. Verified 47 frontend tests, lint, build, 39 backend tests (3 PostgreSQL-only skipped), and mocked Chrome screenshots at 1280/375 px without horizontal overflow; database-backed Playwright E2E was not run in this UI pass.
+- 2026-10-25: Reviewed the Sprint 3 translator UI against Lokalise, Smartcat, and Phrase translator workflows. Confirmed that the current translated-volume summary is per translator, while the weekly remaining estimate is activity-wide; the project has no authoritative total-volume target, so a completion percentage would be misleading. UI direction is pending the user's choice of reference; no product behavior was changed in this review.
+- 2026-10-24: Completed Sprint 3 US-08, US-10, US-11, and US-12 on top of the existing US-09 flow. Added explicit locked Finish/Submit transitions with Review cycle 1, persisted/deduplicated daily and weekly reminders, reminder APIs and scheduler, compact reminder UI, confirmation/submitted states, and matching tests. PostgreSQL activity/concurrency tests passed; full Playwright run on a disposable database passed (25 tests, 2 intentionally skipped on non-desktop mutating flow), as did 45 frontend tests, lint, and build. The state-changing E2E flow now requires `E2E_ISOLATED_DB=true`. See `SPRINT_3_STATUS.md`.
 - 2026-10-22: Started Sprint 3. Added V4 tables for weekly estimates, project Chief Editor assignments, reviews, and notifications; matching models/repositories; demo editor assignment; and a configurable `Asia/Almaty` business clock. Implemented current-week estimate save/update, server permissions/history, responsible-only authorization, post-finish record-write guard, and the weekly panel in the translator detail UI. Verified backend tests, 41 frontend tests, lint/build, clean PostgreSQL V1→V4, and local V3→V4 upgrade/startup. Finish/submission and reminders are not yet implemented.
 - 2026-10-22: Expanded `SPRINT_3_PLAN.md` into an implementation-ready plan for US-08–US-12. It now includes the previously missing submission story, product rules, V4 schema, API contracts, lifecycle/authorization rules, backend/UI architecture, two-week schedule, test matrix, failure modes, work split, Definition of Done, and defense flow.
 - 2026-10-22: Prepared `SPRINT_2_PROCESS_REPORT.md` as a complete handoff for formal course documentation. It records Sprint 2 scope, implementation stages, API/schema/business rules, UI/UX refinements, problems and fixes, verification evidence, demonstration flow, deferred work, key files, and the Git timeline.

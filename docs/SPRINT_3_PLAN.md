@@ -1,8 +1,8 @@
 # Sprint 3 Plan — Estimates, reminders, finish and submission
 
-Last updated: 2026-10-22
+Last updated: 2026-10-24
 
-Status: in progress. Section 5 defaults were adopted for implementation on 2026-10-22. V4 foundation and the weekly-estimate flow are implemented; finish, submission, and reminders remain open.
+Status: implemented locally. Section 5 rules were adopted on 2026-10-22; US-08 through US-12 now have backend and frontend flows. Verification and delivered behavior are recorded in `SPRINT_3_STATUS.md`.
 
 ## 1. Sprint goal
 
@@ -77,11 +77,11 @@ Sprint 3 extends the current layered monolith instead of building a parallel sub
 - Reopening a finished/submitted activity — this needs an explicit later workflow and is not required by US-08–US-12.
 - A final translation-file upload — no file entity or storage requirement exists in the available Sprint 3 sources.
 
-## 5. Recommended product rules to confirm
+## 5. Adopted product rules
 
-These defaults make the plan executable while keeping ambiguous source requirements visible.
+These rules are the implemented Sprint 3 contract. The original master user-story workbook remains unavailable in this workspace.
 
-| Area | Recommended Sprint 3 rule | Reason |
+| Area | Sprint 3 rule | Reason |
 | --- | --- | --- |
 | Week boundary | Monday 00:00 through Sunday 23:59 in `Asia/Almaty` | Clear ISO-style weeks and one project business zone |
 | Estimate owner | Responsible translator only; assistants have read-only visibility | One activity needs one authoritative remaining-volume value |

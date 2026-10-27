@@ -16,6 +16,8 @@ import com.easylang.activitymonitoring.model.User;
 import com.easylang.activitymonitoring.model.WorkRecord;
 import com.easylang.activitymonitoring.repository.ActivityRepository;
 import com.easylang.activitymonitoring.repository.ActivityTranslatorRepository;
+import com.easylang.activitymonitoring.repository.ProjectChiefEditorRepository;
+import com.easylang.activitymonitoring.repository.ReviewRepository;
 import com.easylang.activitymonitoring.repository.UserRepository;
 import com.easylang.activitymonitoring.repository.WorkRecordRepository;
 import com.easylang.activitymonitoring.repository.WeeklyEstimateRepository;
@@ -62,6 +64,12 @@ class TranslatorActivityControllerIntegrationTest {
 
     @Autowired
     private WeeklyEstimateRepository weeklyEstimateRepository;
+
+    @Autowired
+    private ProjectChiefEditorRepository editorRepository;
+
+    @Autowired
+    private ReviewRepository reviewRepository;
 
     @Test
     void unauthenticatedUserCannotListTranslatorActivities() throws Exception {
@@ -226,6 +234,109 @@ class TranslatorActivityControllerIntegrationTest {
                                 {"remainingTextVolume":-1.123}
                                 """))
                 .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void finishAndSubmitRequireCurrentZeroAndCreateOneReview() throws Exception {
+        Cookie accessCookie = login("translator@easylang.local");
+        Csrf csrf = csrf();
+        Long activityId = activityRepository.findByActivityNumber("EL-2026-001").orElseThrow().getId();
+
+        mockMvc.perform(post("/api/v1/translator/activities/{activityId}/finish", activityId)
+                        .cookie(accessCookie, csrf.cookie()).header(csrf.headerName(), csrf.token()))
+                .andExpect(status().isConflict());
+        mockMvc.perform(post("/api/v1/translator/activities/{activityId}/submit-for-checking", activityId)
+                        .cookie(accessCookie, csrf.cookie()).header(csrf.headerName(), csrf.token()))
+                .andExpect(status().isConflict());
+
+        saveEstimate(activityId, accessCookie, csrf, "12.00");
+        mockMvc.perform(post("/api/v1/translator/activities/{activityId}/finish", activityId)
+                        .cookie(accessCookie, csrf.cookie()).header(csrf.headerName(), csrf.token()))
+                .andExpect(status().isConflict());
+
+        saveEstimate(activityId, accessCookie, csrf, "0.00");
+        mockMvc.perform(post("/api/v1/translator/activities/{activityId}/finish", activityId)
+                        .cookie(accessCookie, csrf.cookie()).header(csrf.headerName(), csrf.token()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("FINISHED"))
+                .andExpect(jsonPath("$.permissions.canEditWorkRecords").value(false))
+                .andExpect(jsonPath("$.permissions.canSubmitForChecking").value(true));
+
+        mockMvc.perform(put("/api/v1/translator/activities/{activityId}/weekly-estimates/current", activityId)
+                        .cookie(accessCookie, csrf.cookie()).header(csrf.headerName(), csrf.token())
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"remainingTextVolume\":5}"))
+                .andExpect(status().isConflict());
+        mockMvc.perform(post("/api/v1/translator/activities/{activityId}/work-records", activityId)
+                        .cookie(accessCookie, csrf.cookie()).header(csrf.headerName(), csrf.token())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"recordDate\":\"2026-09-28\",\"translatedVolume\":3}"))
+                .andExpect(status().isConflict());
+
+        mockMvc.perform(post("/api/v1/translator/activities/{activityId}/submit-for-checking", activityId)
+                        .cookie(accessCookie, csrf.cookie()).header(csrf.headerName(), csrf.token()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("UNDER_CHECKING"))
+                .andExpect(jsonPath("$.permissions.canSubmitForChecking").value(false));
+        assertEquals(1, reviewRepository.count());
+        assertEquals("editor@easylang.local", reviewRepository.findAll().get(0).getChiefEditor().getEmail());
+
+        mockMvc.perform(post("/api/v1/translator/activities/{activityId}/submit-for-checking", activityId)
+                        .cookie(accessCookie, csrf.cookie()).header(csrf.headerName(), csrf.token()))
+                .andExpect(status().isConflict());
+        assertEquals(1, reviewRepository.count());
+    }
+
+    @Test
+    void assistantAndUnassignedTranslatorCannotFinishOrSubmit() throws Exception {
+        Cookie accessCookie = login("translator@easylang.local");
+        Csrf csrf = csrf();
+        Long assistantActivityId = activityRepository.findByActivityNumber("EL-2026-003").orElseThrow().getId();
+        Long unassignedActivityId = activityRepository.findByActivityNumber("EL-2026-900").orElseThrow().getId();
+
+        for (String action : new String[] {"finish", "submit-for-checking"}) {
+            mockMvc.perform(post("/api/v1/translator/activities/{activityId}/" + action, assistantActivityId)
+                            .cookie(accessCookie, csrf.cookie()).header(csrf.headerName(), csrf.token()))
+                    .andExpect(status().isForbidden());
+            mockMvc.perform(post("/api/v1/translator/activities/{activityId}/" + action, unassignedActivityId)
+                            .cookie(accessCookie, csrf.cookie()).header(csrf.headerName(), csrf.token()))
+                    .andExpect(status().isNotFound());
+        }
+    }
+
+    @Test
+    void missingResponsibleEditorKeepsActivityFinished() throws Exception {
+        Cookie accessCookie = login("translator@easylang.local");
+        Csrf csrf = csrf();
+        Activity activity = activityRepository.findByActivityNumber("EL-2026-002").orElseThrow();
+        saveEstimate(activity.getId(), accessCookie, csrf, "0");
+        mockMvc.perform(post("/api/v1/translator/activities/{activityId}/finish", activity.getId())
+                        .cookie(accessCookie, csrf.cookie()).header(csrf.headerName(), csrf.token()))
+                .andExpect(status().isOk());
+
+        editorRepository.delete(editorRepository.findByProjectIdAndResponsibleTrue(activity.getProject().getId()).orElseThrow());
+        editorRepository.flush();
+        mockMvc.perform(post("/api/v1/translator/activities/{activityId}/submit-for-checking", activity.getId())
+                        .cookie(accessCookie, csrf.cookie()).header(csrf.headerName(), csrf.token()))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.message").value("No responsible Chief Editor is assigned to this project"));
+        assertEquals("FINISHED", activityRepository.findById(activity.getId()).orElseThrow().getStatus().name());
+        assertEquals(0, reviewRepository.count());
+    }
+
+    @Test
+    void finishRequiresCsrf() throws Exception {
+        Cookie accessCookie = login("translator@easylang.local");
+        Long activityId = activityRepository.findByActivityNumber("EL-2026-001").orElseThrow().getId();
+        mockMvc.perform(post("/api/v1/translator/activities/{activityId}/finish", activityId).cookie(accessCookie))
+                .andExpect(status().isForbidden());
+    }
+
+    private void saveEstimate(Long activityId, Cookie accessCookie, Csrf csrf, String volume) throws Exception {
+        mockMvc.perform(put("/api/v1/translator/activities/{activityId}/weekly-estimates/current", activityId)
+                        .cookie(accessCookie, csrf.cookie()).header(csrf.headerName(), csrf.token())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"remainingTextVolume\":" + volume + "}"))
+                .andExpect(status().isOk());
     }
 
     @Test
