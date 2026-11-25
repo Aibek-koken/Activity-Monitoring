@@ -44,6 +44,9 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
 
   if (!response.ok) {
     const problem = (await response.json().catch(() => null)) as ProblemResponse | null
+    if (response.status === 401 && !path.startsWith('/v1/auth/')) {
+      window.dispatchEvent(new Event('easylang:session-expired'))
+    }
     throw new ApiError(
       response.status,
       problem?.message ?? 'The server could not complete the request.',
@@ -167,6 +170,42 @@ export const reminderApi = {
     await request<void>(`/v1/translator/reminders/${reminderId}/read`, {
       method: 'PATCH',
       headers: { [csrfToken.headerName]: csrfToken.token },
+    })
+  },
+}
+
+export interface ManagerTranslator {
+  id: number
+  name: string
+  initials: string
+  available: boolean
+  openActivities: number
+}
+
+export interface ManagerAssignment {
+  activityId: number
+  activityNumber: string
+  activityName: string
+  projectName: string
+  status: string
+  translators: Array<{
+    translatorId: number
+    translatorName: string
+    responsible: boolean
+    assignedDate: string
+  }>
+}
+
+export const projectManagerApi = {
+  dashboard(): Promise<{ translators: ManagerTranslator[]; assignments: ManagerAssignment[] }> {
+    return request('/v1/project-manager/dashboard')
+  },
+  async replaceTranslator(activityId: number, translatorId: number): Promise<void> {
+    const csrfToken = await csrf()
+    await request<void>(`/v1/project-manager/activities/${activityId}/responsible-translator`, {
+      method: 'PUT',
+      headers: { [csrfToken.headerName]: csrfToken.token },
+      body: JSON.stringify({ translatorId }),
     })
   },
 }

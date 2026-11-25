@@ -36,6 +36,6 @@ app:
     scheduling-enabled: ${REMINDER_SCHEDULING_ENABLED:true}
   security:
     jwt-secret: ${JWT_SECRET:ZWFzeWxhbmctZGV2ZWxvcG1lbnQtc2VjcmV0LWNoYW5nZS1tZS0yMDI2}
-    token-ttl: ${JWT_TTL:PT8H}
+    token-ttl: ${JWT_TTL:P7D}
     secure-cookie: ${SECURE_COOKIE:false}
     allowed-origins: ${ALLOWED_ORIGINS:http://localhost:5173,http://127.0.0.1:5173}

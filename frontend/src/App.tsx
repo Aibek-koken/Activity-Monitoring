@@ -8,6 +8,7 @@ import { NotFoundPage } from './pages/NotFoundPage'
 import { TranslatorActivitiesPage } from './pages/TranslatorActivitiesPage'
 import { TranslatorActivityDetailPage } from './pages/TranslatorActivityDetailPage'
 import { WorkspacePage } from './pages/WorkspacePage'
+import { ProjectManagerDashboardPage } from './pages/ProjectManagerDashboardPage'
 
 export function App() {
   return (
@@ -27,7 +28,7 @@ export function App() {
             <Route path="/chief-editor" element={<WorkspacePage role="CHIEF_EDITOR" />} />
           </Route>
           <Route element={<ProtectedRoute allowedRole="PROJECT_MANAGER" />}>
-            <Route path="/project-manager" element={<WorkspacePage role="PROJECT_MANAGER" />} />
+            <Route path="/project-manager" element={<ProjectManagerDashboardPage />} />
           </Route>
           <Route path="*" element={<NotFoundPage />} />
         </Routes>

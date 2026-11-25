@@ -14,6 +14,8 @@ import org.springframework.data.repository.query.Param;
 public interface ActivityTranslatorRepository extends JpaRepository<ActivityTranslator, Long> {
     boolean existsByActivityIdAndTranslatorId(Long activityId, Long translatorId);
 
+    boolean existsByActivityIdAndResponsibleTrue(Long activityId);
+
     Optional<ActivityTranslator> findByActivityIdAndTranslatorId(Long activityId, Long translatorId);
 
     @Query("""
@@ -65,4 +67,16 @@ public interface ActivityTranslatorRepository extends JpaRepository<ActivityTran
     boolean hasActiveAssignment(@Param("translatorId") Long translatorId,
                                 @Param("statuses") Collection<ActivityStatus> statuses,
                                 @Param("date") LocalDate date);
+
+    @Query("""
+            select assignment from ActivityTranslator assignment
+            join fetch assignment.activity activity
+            join fetch activity.project project
+            join fetch assignment.translator translator
+            where project.projectManager.id = :managerId
+            order by project.projectName, activity.activityNumber
+            """)
+    List<ActivityTranslator> findForProjectManager(@Param("managerId") Long managerId);
+
+    List<ActivityTranslator> findAllByActivityId(Long activityId);
 }

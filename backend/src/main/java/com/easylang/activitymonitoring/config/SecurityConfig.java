@@ -59,6 +59,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/v1/workspaces/translator/**").hasRole("TRANSLATOR")
                         .requestMatchers("/api/v1/workspaces/chief-editor/**").hasRole("CHIEF_EDITOR")
                         .requestMatchers("/api/v1/workspaces/project-manager/**").hasRole("PROJECT_MANAGER")
+                        .requestMatchers("/api/v1/project-manager/**").hasRole("PROJECT_MANAGER")
                         .anyRequest().authenticated()
                 )
                 .exceptionHandling(exceptions -> exceptions

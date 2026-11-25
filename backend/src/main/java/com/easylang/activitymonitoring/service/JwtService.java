@@ -22,7 +22,7 @@ public class JwtService {
 
     public JwtService(
             @Value("${app.security.jwt-secret}") String jwtSecret,
-            @Value("${app.security.token-ttl:PT8H}") Duration tokenTtl
+            @Value("${app.security.token-ttl:P7D}") Duration tokenTtl
     ) {
         this.signingKey = Keys.hmacShaKeyFor(Decoders.BASE64.decode(jwtSecret));
         this.tokenTtl = tokenTtl;

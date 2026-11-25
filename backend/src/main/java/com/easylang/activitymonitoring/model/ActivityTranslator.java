@@ -66,6 +66,10 @@ public class ActivityTranslator {
         return responsible;
     }
 
+    public void setResponsible(boolean responsible) {
+        this.responsible = responsible;
+    }
+
     public LocalDate getAssignedDate() {
         return assignedDate;
     }

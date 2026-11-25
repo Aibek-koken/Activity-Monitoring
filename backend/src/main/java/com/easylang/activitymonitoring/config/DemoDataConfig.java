@@ -86,6 +86,11 @@ public class DemoDataConfig implements ApplicationRunner {
         List<SeedUser> seedUsers = List.of(
                 new SeedUser("translator@easylang.local", "MC", "Maya Chen", Role.TRANSLATOR),
                 new SeedUser("translator2@easylang.local", "RA", "Ravi Anand", Role.TRANSLATOR),
+                new SeedUser("translator3@easylang.local", "AK", "Amina Karim", Role.TRANSLATOR),
+                new SeedUser("translator4@easylang.local", "DM", "Dana Miras", Role.TRANSLATOR),
+                new SeedUser("translator5@easylang.local", "NS", "Nurlan Sadyk", Role.TRANSLATOR),
+                new SeedUser("translator6@easylang.local", "SR", "Sara Rakhim", Role.TRANSLATOR),
+                new SeedUser("translator7@easylang.local", "LO", "Leila Omar", Role.TRANSLATOR),
                 new SeedUser("editor@easylang.local", "EB", "Elias Brooks", Role.CHIEF_EDITOR),
                 new SeedUser("manager@easylang.local", "OG", "Oliver Grant", Role.PROJECT_MANAGER)
         );
@@ -107,8 +112,14 @@ public class DemoDataConfig implements ApplicationRunner {
                 manager,
                 LocalDate.of(2026, 9, 25)
         );
+        Project healthcare = findOrCreateProject(
+                "Healthcare Support Localization",
+                manager,
+                LocalDate.of(2026, 9, 27)
+        );
         assignEditorIfMissing(legalPortal, editor);
         assignEditorIfMissing(productLaunch, editor);
+        assignEditorIfMissing(healthcare, editor);
 
         Activity privacyPolicy = findOrCreateActivity(
                 "EL-2026-001",
@@ -138,11 +149,20 @@ public class DemoDataConfig implements ApplicationRunner {
                 ActivityStatus.ASSIGNED,
                 LocalDate.of(2026, 9, 26)
         );
+        Activity patientGuide = findOrCreateActivity(
+                "EL-2026-004",
+                "Patient onboarding guide",
+                healthcare,
+                ActivityStatus.ASSIGNED,
+                LocalDate.of(2026, 9, 27)
+        );
 
         assignIfMissing(privacyPolicy, translator, true, LocalDate.of(2026, 9, 22));
         assignIfMissing(contractAppendix, translator, true, LocalDate.of(2026, 9, 23));
         assignIfMissing(launchEmails, translator, false, LocalDate.of(2026, 9, 25));
+        assignIfMissing(launchEmails, secondTranslator, true, LocalDate.of(2026, 9, 25));
         assignIfMissing(otherTranslatorActivity, secondTranslator, true, LocalDate.of(2026, 9, 26));
+        assignIfMissing(patientGuide, secondTranslator, true, LocalDate.of(2026, 9, 27));
 
         recordIfMissing(
                 privacyPolicy,
@@ -202,9 +222,17 @@ public class DemoDataConfig implements ApplicationRunner {
     }
 
     private void assignIfMissing(Activity activity, User translator, boolean responsible, LocalDate assignedDate) {
-        if (!activityTranslatorRepository.existsByActivityIdAndTranslatorId(activity.getId(), translator.getId())) {
-            activityTranslatorRepository.save(new ActivityTranslator(activity, translator, responsible, assignedDate));
+        var existing = activityTranslatorRepository.findByActivityIdAndTranslatorId(activity.getId(), translator.getId());
+        if (existing.isPresent()) {
+            if (responsible && !existing.get().isResponsible()
+                    && !activityTranslatorRepository.existsByActivityIdAndResponsibleTrue(activity.getId())) {
+                existing.get().setResponsible(true);
+            }
+            return;
         }
+        boolean assignAsResponsible = responsible
+                && !activityTranslatorRepository.existsByActivityIdAndResponsibleTrue(activity.getId());
+        activityTranslatorRepository.save(new ActivityTranslator(activity, translator, assignAsResponsible, assignedDate));
     }
 
     private void assignEditorIfMissing(Project project, User editor) {

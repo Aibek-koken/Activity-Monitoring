@@ -1,14 +1,14 @@
 # State
 
-Last updated: 2026-10-28
+Last updated: 2026-11-25
 
 ## Current Summary
 
-Sprints 1–3 are complete locally. Sprint 1 provides database-backed login, cookie JWT auth, CSRF, role-based protected workspaces, demo users, logout, and a public landing page. Sprint 2 lets translators load/search/open assignments, see cumulative translated volume, and create or edit daily records; its UI has breadcrumbs and compact filters/histories. Sprint 3 adds weekly remaining-volume estimates, daily/weekly in-app reminders, explicit zero-remaining Finish, and submission for Chief Editor checking with one Review cycle.
+Sprints 1–3 are complete locally. Sprint 1 provides database-backed login, cookie JWT auth, CSRF, role-based protected workspaces, demo users, logout, and a public landing page. Sprint 2 lets translators load/search/open assignments, see cumulative translated volume, and create or edit daily records; its UI has breadcrumbs and compact filters/histories. Sprint 3 adds weekly remaining-volume estimates, daily/weekly in-app reminders, explicit zero-remaining Finish, and submission for Chief Editor checking with one Review cycle. A local Project Manager staffing implementation for Sprint 5 stories 28–30 is also underway.
 
 ## In Progress
 
-- No incomplete Sprint 3 story remains. The next implementation stage is Sprint 4 Chief Editor checking; its workflow has not been started.
+- No incomplete Sprint 3 story remains. Sprint 4 Chief Editor checking has not started. Sprint 5 stories 28–30 have a local implementation under review.
 
 ## Next Priorities
 
@@ -22,6 +22,7 @@ Sprints 1–3 are complete locally. Sprint 1 provides database-backed login, coo
 - Production settings still need a real JWT secret, secure cookies over HTTPS, narrowed CORS origins, and demo seeding disabled.
 - The separate 5 responsible + 10 assisting active-assignment limits are documented future requirements, not enforced by the current demo seeding or an assignment API.
 - The original six-sprint overview and master user-story file referenced in `PROJECT_CONTEXT.md` are not present in this workspace. Sprint 3's scope was cross-checked against available design sources; reminder schedule and estimate ownership are recorded project decisions.
+- The staffing demo infers availability from open assignments in manager-owned projects. The schema has no schedule, capacity, or time-off data.
 
 ## Decisions Made
 
@@ -62,3 +63,5 @@ Sprints 1–3 are complete locally. Sprint 1 provides database-backed login, coo
 - Sprint 2 Stage 2 added create/edit daily work record APIs, backend validation for decimal volume/work hours and future dates, duplicate-date protection, progress recalculation from cumulative translated volume, and a translator detail-page record form with loading, validation, error, and success states.
 - Sprint 2 Stage 3 restored the edited V2 migration and moved the rename into V3, validated the full migration chain on PostgreSQL 17 via Docker, added ownership/CSRF/date tests, polished accessibility semantics, and completed the US-03 through US-07 QA pass.
 - Fixed the blank translator detail page: the API omits null fields, so the page crashed on `workHours.toFixed`; nullable fields are now optional in the types and formatted defensively, with an en-US locale, a route error boundary, a cleaned-up summary row, and regression tests.
+
+- 2026-11-25: Added the Project Manager staffing dashboard and a responsible-translator replacement API. The dashboard groups translator assignments by activity, shows workload and availability, and supports replacement by an available translator or a supporting translator already assigned to the activity. Added demo project and translator data. Flyway V5 cleans duplicate responsible assignments and enforces at most one responsible translator per activity; demo seeding respects that constraint. Extended the default JWT lifetime to seven days and clear in-memory auth on protected API 401 responses. Backend/frontend builds passed; a manual API check confirmed three projects, unique activity rows, one responsible translator per activity, and a successful replacement request. Automated tests were not run.

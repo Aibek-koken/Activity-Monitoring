@@ -44,6 +44,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     void loadSession()
   }, [loadSession])
 
+  useEffect(() => {
+    const expireSession = () => {
+      setUser(null)
+      setStatus('anonymous')
+      setError(null)
+    }
+    window.addEventListener('easylang:session-expired', expireSession)
+    return () => window.removeEventListener('easylang:session-expired', expireSession)
+  }, [])
+
   const login = useCallback(async (email: string, password: string) => {
     const authenticatedUser = await authApi.login(email, password)
     setUser(authenticatedUser)
