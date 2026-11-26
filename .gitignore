@@ -19,3 +19,6 @@ frontend/test-results/
 *.log
 
 .codex-build/
+.agent-runs/
+
+backend/data/

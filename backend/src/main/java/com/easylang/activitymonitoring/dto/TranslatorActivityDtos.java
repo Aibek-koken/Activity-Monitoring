@@ -43,7 +43,19 @@ public final class TranslatorActivityDtos {
             CurrentWeekResponse currentWeek,
             WeeklyEstimateResponse currentWeekEstimate,
             List<WeeklyEstimateResponse> weeklyEstimates,
+            ReworkSummaryResponse rework,
             ActivityPermissionsResponse permissions
+    ) {
+    }
+
+    public record ReworkSummaryResponse(
+            Integer correctionReviewId,
+            Integer correctionPages,
+            BigDecimal reworkRecordedPages,
+            BigDecimal outstandingReworkPages,
+            BigDecimal remainingPages,
+            BigDecimal totalRemainingPages,
+            boolean hasWeeklyEstimate
     ) {
     }
 
@@ -63,7 +75,10 @@ public final class TranslatorActivityDtos {
             boolean canEditWeeklyEstimate,
             boolean canFinish,
             boolean canSubmitForChecking,
-            boolean hasResponsibleChiefEditor
+            boolean canSubmitWeeklyVersion,
+            boolean hasResponsibleChiefEditor,
+            boolean hasOpenReview,
+            boolean hasOutstandingRework
     ) {
     }
 
@@ -86,6 +101,7 @@ public final class TranslatorActivityDtos {
             Long id,
             LocalDate recordDate,
             BigDecimal translatedVolume,
+            BigDecimal reworkPages,
             BigDecimal workHours
     ) {
     }
@@ -94,8 +110,8 @@ public final class TranslatorActivityDtos {
             @NotNull(message = "Record date is required")
             LocalDate recordDate,
 
-            @NotNull(message = "Translated volume is required")
-            @DecimalMin(value = "0.01", message = "Translated volume must be greater than 0")
+            @NotNull(message = "Translated pages are required")
+            @DecimalMin(value = "0.00", message = "Translated pages cannot be negative")
             @DecimalMax(value = "1000.00", message = "Translated volume must be 1,000.00 or less")
             @Digits(integer = 4, fraction = 2, message = "Translated volume can have up to 2 decimal places")
             BigDecimal translatedVolume,
@@ -103,13 +119,18 @@ public final class TranslatorActivityDtos {
             @DecimalMin(value = "0.00", message = "Work hours cannot be negative")
             @DecimalMax(value = "24.00", message = "Work hours must be 24.00 or less")
             @Digits(integer = 2, fraction = 2, message = "Work hours can have up to 2 decimal places")
-            BigDecimal workHours
+            BigDecimal workHours,
+
+            @DecimalMin(value = "0.00", message = "Rework pages cannot be negative")
+            @DecimalMax(value = "1000.00", message = "Rework pages must be 1000.00 or less")
+            @Digits(integer = 4, fraction = 2, message = "Rework pages can have up to 2 decimal places")
+            BigDecimal reworkPages
     ) {
     }
 
     public record UpdateWorkRecordRequest(
-            @NotNull(message = "Translated volume is required")
-            @DecimalMin(value = "0.01", message = "Translated volume must be greater than 0")
+            @NotNull(message = "Translated pages are required")
+            @DecimalMin(value = "0.00", message = "Translated pages cannot be negative")
             @DecimalMax(value = "1000.00", message = "Translated volume must be 1,000.00 or less")
             @Digits(integer = 4, fraction = 2, message = "Translated volume can have up to 2 decimal places")
             BigDecimal translatedVolume,
@@ -117,7 +138,16 @@ public final class TranslatorActivityDtos {
             @DecimalMin(value = "0.00", message = "Work hours cannot be negative")
             @DecimalMax(value = "24.00", message = "Work hours must be 24.00 or less")
             @Digits(integer = 2, fraction = 2, message = "Work hours can have up to 2 decimal places")
-            BigDecimal workHours
+            BigDecimal workHours,
+
+            @DecimalMin(value = "0.00", message = "Rework pages cannot be negative")
+            @DecimalMax(value = "1000.00", message = "Rework pages must be 1000.00 or less")
+            @Digits(integer = 4, fraction = 2, message = "Rework pages can have up to 2 decimal places")
+            BigDecimal reworkPages,
+            Long editRequestId
     ) {
+        public UpdateWorkRecordRequest(BigDecimal translatedVolume, BigDecimal workHours, BigDecimal reworkPages) {
+            this(translatedVolume, workHours, reworkPages, null);
+        }
     }
 }

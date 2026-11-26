@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { AlertCircle, LayoutDashboard, RefreshCw, UsersRound } from 'lucide-react'
+import { AlertCircle, ClipboardCheck, LayoutDashboard, RefreshCw, UsersRound } from 'lucide-react'
 import { useAuth } from '../auth/AuthContext'
 import { WorkspaceLayout } from '../components/WorkspaceLayout'
 import { ApiError, projectManagerApi, type ManagerAssignment, type ManagerTranslator } from '../lib/api'
@@ -103,7 +103,10 @@ export function ProjectManagerDashboardPage() {
     <WorkspaceLayout
       role="PROJECT_MANAGER"
       title="Translator staffing"
-      navItems={[{ end: true, icon: <LayoutDashboard size={18} aria-hidden="true" />, label: 'Staffing', to: '/project-manager' }]}
+      navItems={[
+        { end: true, icon: <LayoutDashboard size={18} aria-hidden="true" />, label: 'Staffing', to: '/project-manager' },
+        { icon: <ClipboardCheck size={18} aria-hidden="true" />, label: 'Edit requests', to: '/project-manager/requests' },
+      ]}
     >
       <div className="workspace-content">
         <section className="workspace-hero">

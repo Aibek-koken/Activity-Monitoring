@@ -1,5 +1,6 @@
 package com.easylang.activitymonitoring.common;
 
+import com.easylang.activitymonitoring.storage.DocumentStorageException;
 import jakarta.servlet.http.HttpServletRequest;
 import java.time.Instant;
 import java.util.LinkedHashMap;
@@ -10,6 +11,7 @@ import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.server.ResponseStatusException;
 
 @RestControllerAdvice
@@ -61,6 +63,29 @@ public class ApiExceptionHandler {
                 "Check the highlighted fields",
                 request.getRequestURI(),
                 errors
+        ));
+    }
+
+    @ExceptionHandler(DocumentStorageException.class)
+    ResponseEntity<ProblemResponse> documentStorage(
+            DocumentStorageException exception,
+            HttpServletRequest request
+    ) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ProblemResponse.of(
+                HttpStatus.NOT_FOUND.value(),
+                "Not Found",
+                "The review document is not available",
+                request.getRequestURI()
+        ));
+    }
+
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    ResponseEntity<ProblemResponse> uploadTooLarge(HttpServletRequest request) {
+        return ResponseEntity.badRequest().body(ProblemResponse.of(
+                HttpStatus.BAD_REQUEST.value(),
+                "Bad Request",
+                "The document exceeds the upload size limit",
+                request.getRequestURI()
         ));
     }
 }

@@ -12,11 +12,17 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 public interface ActivityTranslatorRepository extends JpaRepository<ActivityTranslator, Long> {
+    @Query("select assignment from ActivityTranslator assignment where assignment.translator.id = :translatorId and assignment.activity.id in :activityIds")
+    List<ActivityTranslator> findForActivityList(@Param("translatorId") Long translatorId,
+                                                  @Param("activityIds") Collection<Long> activityIds);
+
     boolean existsByActivityIdAndTranslatorId(Long activityId, Long translatorId);
 
     boolean existsByActivityIdAndResponsibleTrue(Long activityId);
 
     Optional<ActivityTranslator> findByActivityIdAndTranslatorId(Long activityId, Long translatorId);
+
+    Optional<ActivityTranslator> findByActivityIdAndResponsibleTrue(Long activityId);
 
     @Query("""
             select distinct assignment.translator.id

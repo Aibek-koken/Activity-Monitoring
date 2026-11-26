@@ -9,7 +9,9 @@ import com.easylang.activitymonitoring.model.NotificationType;
 import com.easylang.activitymonitoring.model.Role;
 import com.easylang.activitymonitoring.model.User;
 import com.easylang.activitymonitoring.repository.ActivityTranslatorRepository;
+import com.easylang.activitymonitoring.model.ReviewKind;
 import com.easylang.activitymonitoring.repository.NotificationRepository;
+import com.easylang.activitymonitoring.repository.ReviewRepository;
 import com.easylang.activitymonitoring.repository.UserRepository;
 import com.easylang.activitymonitoring.repository.WeeklyEstimateRepository;
 import com.easylang.activitymonitoring.repository.WorkRecordRepository;
@@ -41,6 +43,7 @@ public class ReminderService {
     private final WorkRecordRepository recordRepository;
     private final WeeklyEstimateRepository estimateRepository;
     private final NotificationRepository notificationRepository;
+    private final ReviewRepository reviewRepository;
     private final UserRepository userRepository;
     private final NotificationWriter notificationWriter;
     private final Clock businessClock;
@@ -49,6 +52,7 @@ public class ReminderService {
                            WorkRecordRepository recordRepository,
                            WeeklyEstimateRepository estimateRepository,
                            NotificationRepository notificationRepository,
+                           ReviewRepository reviewRepository,
                            UserRepository userRepository,
                            NotificationWriter notificationWriter,
                            Clock businessClock) {
@@ -56,6 +60,7 @@ public class ReminderService {
         this.recordRepository = recordRepository;
         this.estimateRepository = estimateRepository;
         this.notificationRepository = notificationRepository;
+        this.reviewRepository = reviewRepository;
         this.userRepository = userRepository;
         this.notificationWriter = notificationWriter;
         this.businessClock = businessClock;
@@ -70,7 +75,9 @@ public class ReminderService {
             createDailyReminders(today);
         }
         if (day == DayOfWeek.FRIDAY && !time.isBefore(LocalTime.of(16, 0))) {
-            createWeeklyReminders(today.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY)));
+            LocalDate weekStart = today.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
+            createWeeklyReminders(weekStart);
+            createWeeklySubmissionReminders(weekStart);
         }
     }
 
@@ -78,6 +85,7 @@ public class ReminderService {
         Set<Long> recordedIds = Set.copyOf(recordRepository.findTranslatorIdsWithRecordsOn(today));
         List<Long> missingIds = assignmentRepository.findActiveTranslatorIds(ACTIVE_STATUSES, Role.TRANSLATOR, today)
                 .stream().filter(id -> !recordedIds.contains(id)).toList();
+
         Map<Long, User> users = userRepository.findAllById(missingIds).stream()
                 .collect(Collectors.toMap(User::getId, Function.identity()));
         Set<String> existingKeys = Set.copyOf(notificationRepository.findDedupeKeys(
@@ -113,6 +121,29 @@ public class ReminderService {
         }
     }
 
+    private void createWeeklySubmissionReminders(LocalDate weekStart) {
+        Set<String> existingKeys = Set.copyOf(notificationRepository.findDedupeKeys(
+                NotificationType.WEEKLY_SUBMISSION_REMINDER, weekStart
+        ));
+        LocalDate today = LocalDate.now(businessClock);
+        for (ActivityTranslator assignment : assignmentRepository.findActiveResponsibleAssignments(
+                ACTIVE_STATUSES, Role.TRANSLATOR, today
+        )) {
+            Long activityId = assignment.getActivity().getId();
+            if (!reviewRepository.existsByActivityIdAndKindAndWeekStartDate(activityId, ReviewKind.WEEKLY, weekStart)) {
+                persistIfNew(new Notification(
+                        assignment.getTranslator(),
+                        assignment.getActivity(),
+                        NotificationType.WEEKLY_SUBMISSION_REMINDER,
+                        weekStart,
+                        "Send this week's PDF version for " + assignment.getActivity().getActivityNumber()
+                                + ". You can keep recording daily work.",
+                        businessClock.instant()
+                ), existingKeys);
+            }
+        }
+    }
+
     private void persistIfNew(Notification notification, Set<String> existingKeys) {
         if (existingKeys.contains(notification.getDedupeKey())) return;
         try {
@@ -132,15 +163,32 @@ public class ReminderService {
         Set<Long> activeResponsibleIds = Set.copyOf(assignmentRepository.findActiveResponsibleActivityIds(
                 translatorId, ACTIVE_STATUSES, today
         ));
+        Set<Long> correctionResponsibleIds = new java.util.HashSet<>(
+                reviewRepository.findActivityIdsWithPendingCorrection(translatorId)
+        );
+        correctionResponsibleIds.addAll(assignmentRepository.findActiveResponsibleActivityIds(
+                translatorId, List.of(ActivityStatus.CORRECTION_REQUIRED), today
+        ));
         Set<Long> estimatedIds = Set.copyOf(estimateRepository.findActivityIdsEstimatedForWeek(weekStart));
+        Set<Long> weeklySubmittedIds = Set.copyOf(reviewRepository.findActivityIdsWithWeeklyVersion(weekStart));
 
         List<ReminderResponse> reminders = notificationRepository.findUnreadByUser(translatorId).stream()
-                .filter(notification -> notification.getType() == NotificationType.DAILY_RECORD_REMINDER
-                        ? notification.getPeriodDate().equals(today) && hasActiveAssignment && !recordedToday
-                        : notification.getPeriodDate().equals(weekStart)
-                                && notification.getActivity() != null
-                                && activeResponsibleIds.contains(notification.getActivity().getId())
-                                && !estimatedIds.contains(notification.getActivity().getId()))
+                .filter(notification -> switch (notification.getType()) {
+                    case DAILY_RECORD_REMINDER -> notification.getPeriodDate().equals(today)
+                            && hasActiveAssignment
+                            && !recordedToday;
+                    case WEEKLY_ESTIMATE_REMINDER -> notification.getPeriodDate().equals(weekStart)
+                            && notification.getActivity() != null
+                            && activeResponsibleIds.contains(notification.getActivity().getId())
+                            && !estimatedIds.contains(notification.getActivity().getId());
+                    case WEEKLY_SUBMISSION_REMINDER -> notification.getPeriodDate().equals(weekStart)
+                            && notification.getActivity() != null
+                            && activeResponsibleIds.contains(notification.getActivity().getId())
+                            && !weeklySubmittedIds.contains(notification.getActivity().getId());
+                    case CORRECTION_REQUESTED -> notification.getActivity() != null
+                            && correctionResponsibleIds.contains(notification.getActivity().getId());
+                    case RECORD_EDIT_REQUESTED, RECORD_EDIT_APPROVED, RECORD_EDIT_REJECTED -> false;
+                })
                 .map(this::toResponse)
                 .toList();
         return new ReminderListResponse(reminders);

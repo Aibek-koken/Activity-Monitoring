@@ -11,20 +11,37 @@ import com.easylang.activitymonitoring.model.Role;
 import com.easylang.activitymonitoring.model.User;
 import com.easylang.activitymonitoring.model.WeeklyEstimate;
 import com.easylang.activitymonitoring.model.WorkRecord;
+import com.easylang.activitymonitoring.model.Review;
+import com.easylang.activitymonitoring.model.ReviewKind;
+import com.easylang.activitymonitoring.model.ReviewAnnotation;
+import com.easylang.activitymonitoring.model.AnnotationKind;
 import com.easylang.activitymonitoring.repository.ActivityRepository;
 import com.easylang.activitymonitoring.repository.ActivityTranslatorRepository;
 import com.easylang.activitymonitoring.repository.NotificationRepository;
 import com.easylang.activitymonitoring.repository.ProjectRepository;
 import com.easylang.activitymonitoring.repository.ProjectChiefEditorRepository;
 import com.easylang.activitymonitoring.repository.UserRepository;
+import com.easylang.activitymonitoring.service.ChiefEditorAssignmentService;
 import com.easylang.activitymonitoring.repository.WeeklyEstimateRepository;
 import com.easylang.activitymonitoring.repository.WorkRecordRepository;
+import com.easylang.activitymonitoring.repository.ReviewRepository;
+import com.easylang.activitymonitoring.repository.ReviewAnnotationRepository;
+import com.easylang.activitymonitoring.storage.PrivateDocumentStorageService;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.temporal.TemporalAdjusters;
 import java.util.List;
+import java.util.Locale;
+import org.apache.pdfbox.pdmodel.PDDocument;
+import org.apache.pdfbox.pdmodel.PDPage;
+import org.apache.pdfbox.pdmodel.PDPageContentStream;
+import org.apache.pdfbox.pdmodel.common.PDRectangle;
+import org.apache.pdfbox.pdmodel.font.PDType1Font;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -50,9 +67,13 @@ public class DemoDataConfig implements ApplicationRunner {
     private final WorkRecordRepository workRecordRepository;
     private final WeeklyEstimateRepository weeklyEstimateRepository;
     private final NotificationRepository notificationRepository;
+    private final ReviewRepository reviewRepository;
+    private final ReviewAnnotationRepository reviewAnnotationRepository;
+    private final PrivateDocumentStorageService documentStorage;
     private final PasswordEncoder passwordEncoder;
     private final Clock businessClock;
     private final Environment environment;
+    private final ChiefEditorAssignmentService chiefEditorAssignments;
 
     public DemoDataConfig(
             UserRepository userRepository,
@@ -63,9 +84,13 @@ public class DemoDataConfig implements ApplicationRunner {
             WorkRecordRepository workRecordRepository,
             WeeklyEstimateRepository weeklyEstimateRepository,
             NotificationRepository notificationRepository,
+            ReviewRepository reviewRepository,
+            ReviewAnnotationRepository reviewAnnotationRepository,
+            PrivateDocumentStorageService documentStorage,
             PasswordEncoder passwordEncoder,
             Clock businessClock,
-            Environment environment
+            Environment environment,
+            ChiefEditorAssignmentService chiefEditorAssignments
     ) {
         this.userRepository = userRepository;
         this.projectRepository = projectRepository;
@@ -75,9 +100,13 @@ public class DemoDataConfig implements ApplicationRunner {
         this.workRecordRepository = workRecordRepository;
         this.weeklyEstimateRepository = weeklyEstimateRepository;
         this.notificationRepository = notificationRepository;
+        this.reviewRepository = reviewRepository;
+        this.reviewAnnotationRepository = reviewAnnotationRepository;
+        this.documentStorage = documentStorage;
         this.passwordEncoder = passwordEncoder;
         this.businessClock = businessClock;
         this.environment = environment;
+        this.chiefEditorAssignments = chiefEditorAssignments;
     }
 
     @Override
@@ -92,6 +121,7 @@ public class DemoDataConfig implements ApplicationRunner {
                 new SeedUser("translator6@easylang.local", "SR", "Sara Rakhim", Role.TRANSLATOR),
                 new SeedUser("translator7@easylang.local", "LO", "Leila Omar", Role.TRANSLATOR),
                 new SeedUser("editor@easylang.local", "EB", "Elias Brooks", Role.CHIEF_EDITOR),
+                new SeedUser("editor2@easylang.local", "SB", "Sofia Bianchi", Role.CHIEF_EDITOR),
                 new SeedUser("manager@easylang.local", "OG", "Oliver Grant", Role.PROJECT_MANAGER)
         );
 
@@ -101,6 +131,7 @@ public class DemoDataConfig implements ApplicationRunner {
         User secondTranslator = userRepository.findByEmailIgnoreCase("translator2@easylang.local").orElseThrow();
         User manager = userRepository.findByEmailIgnoreCase("manager@easylang.local").orElseThrow();
         User editor = userRepository.findByEmailIgnoreCase("editor@easylang.local").orElseThrow();
+        User assistantEditor = userRepository.findByEmailIgnoreCase("editor2@easylang.local").orElseThrow();
 
         Project legalPortal = findOrCreateProject(
                 "Central Asia Legal Portal",
@@ -117,9 +148,10 @@ public class DemoDataConfig implements ApplicationRunner {
                 manager,
                 LocalDate.of(2026, 9, 27)
         );
-        assignEditorIfMissing(legalPortal, editor);
-        assignEditorIfMissing(productLaunch, editor);
-        assignEditorIfMissing(healthcare, editor);
+        // A Chief Editor is responsible for exactly one project; others may assist.
+        chiefEditorAssignments.assign(legalPortal, editor, true);
+        chiefEditorAssignments.move(productLaunch, editor, assistantEditor, true);
+        chiefEditorAssignments.assign(healthcare, assistantEditor, false);
 
         Activity privacyPolicy = findOrCreateActivity(
                 "EL-2026-001",
@@ -187,7 +219,101 @@ public class DemoDataConfig implements ApplicationRunner {
         );
 
         if (!environment.acceptsProfiles(Profiles.of("test"))) {
+            rehomeDemoPortfolio(editor, assistantEditor);
             seedSprint3Showcase(translator, privacyPolicy, contractAppendix);
+            if (environment.getProperty("app.seed-demo-portfolio", Boolean.class, true)) {
+                seedDemoPortfolio(translator, manager, assistantEditor);
+            }
+            assignMayaDemoProjects(translator, legalPortal, assistantEditor);
+            seedNotificationShowcase(translator, manager, privacyPolicy, contractAppendix, launchEmails);
+        }
+    }
+
+    private void assignMayaDemoProjects(User maya, Project eliasProject, User sofia) {
+        // Demo-only exception: Sofia needs every Maya project to exercise the review flow.
+        // The production assignment service still enforces one responsible project per editor.
+        for (Project project : projectRepository.findAssignedToTranslator(maya.getId())) {
+            if (project.getId().equals(eliasProject.getId())) continue;
+            var existingResponsible = projectChiefEditorRepository.findByProjectIdAndResponsibleTrue(project.getId());
+            if (existingResponsible.isPresent() && !existingResponsible.get().getChiefEditor().getId().equals(sofia.getId())) {
+                continue;
+            }
+            ProjectChiefEditor assignment = projectChiefEditorRepository
+                    .findByProjectIdAndChiefEditorId(project.getId(), sofia.getId())
+                    .orElseGet(() -> projectChiefEditorRepository.save(new ProjectChiefEditor(project, sofia, true)));
+            if (!assignment.isResponsible()) {
+                assignment.makeResponsible();
+                projectChiefEditorRepository.save(assignment);
+            }
+        }
+    }
+
+    private void rehomeDemoPortfolio(User previousEditor, User assistantEditor) {
+        projectRepository.findByProjectNameStartingWith("Demo · ").forEach(project ->
+                chiefEditorAssignments.move(project, previousEditor, assistantEditor, false));
+        reviewRepository.reassignChiefEditorForActivityNumbers(
+                previousEditor.getId(), assistantEditor, "EL-DEMO-%");
+    }
+
+    private void seedDemoPortfolio(User maya, User manager, User assistantEditor) {
+        String[] names = {"Clinical Device Guides", "Rail Safety Handbook", "Energy Contract Library",
+                "Public Health Portal", "University Courseware", "Agricultural Export Forms",
+                "Aviation Service Manuals", "Museum Archive Translation", "Mobile Banking Help",
+                "City Transport Notices"};
+        LocalDate weekStart = LocalDate.now(businessClock).with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
+        for (int projectIndex = 0; projectIndex < names.length; projectIndex++) {
+            Project project = findOrCreateProject("Demo · " + names[projectIndex], manager,
+                    LocalDate.of(2026, 9, 1).plusDays(projectIndex));
+            chiefEditorAssignments.assign(project, assistantEditor, false);
+            for (int activityIndex = 0; activityIndex < 2; activityIndex++) {
+                int number = 101 + projectIndex * 2 + activityIndex;
+                Activity activity = findOrCreateActivity("EL-DEMO-" + number,
+                        activityIndex == 0 ? "Main translation" : "Terminology appendix",
+                        project, ActivityStatus.IN_PROGRESS, LocalDate.of(2026, 9, 1).plusDays(projectIndex));
+                assignIfMissing(activity, maya, true, activity.getCreatedDate());
+                if (reviewRepository.countByActivityId(activity.getId()) > 0) continue;
+                try {
+                    byte[] pdf = demoPdf(activity.getActivityNumber(), project.getProjectName());
+                    var stored = documentStorage.store(new ByteArrayInputStream(pdf));
+                    Review review = new Review(activity, assistantEditor, 1, ReviewKind.WEEKLY, weekStart,
+                            businessClock.instant());
+                    review.attachDocument(stored.storageKey(), activity.getActivityNumber() + ".pdf",
+                            "application/pdf", stored.sizeBytes(), stored.sha256());
+                    review = reviewRepository.saveAndFlush(review);
+                    float x = (72 + PDType1Font.HELVETICA.getStringWidth("Check ") / 1000f * 14) / PDRectangle.A4.getWidth();
+                    float width = PDType1Font.HELVETICA.getStringWidth("terminology") / 1000f * 14 / PDRectangle.A4.getWidth();
+                    float y = (PDRectangle.A4.getHeight() - 712) / PDRectangle.A4.getHeight();
+                    float height = 16 / PDRectangle.A4.getHeight();
+                    String rect = String.format(Locale.ROOT,
+                            "[{\"x\":%.5f,\"y\":%.5f,\"width\":%.5f,\"height\":%.5f}]", x, y, width, height);
+                    reviewAnnotationRepository.save(new ReviewAnnotation(review, 1, AnnotationKind.HIGHLIGHT,
+                            rect, "terminology", "Check this terminology against the source.", null,
+                            businessClock.instant()));
+                } catch (IOException exception) {
+                    throw new IllegalStateException("Could not create local demo PDF", exception);
+                }
+            }
+        }
+    }
+
+    private byte[] demoPdf(String activityNumber, String projectName) throws IOException {
+        try (PDDocument document = new PDDocument(); ByteArrayOutputStream bytes = new ByteArrayOutputStream()) {
+            PDPage page = new PDPage(PDRectangle.A4);
+            document.addPage(page);
+            try (PDPageContentStream content = new PDPageContentStream(document, page)) {
+                content.beginText();
+                content.setFont(PDType1Font.HELVETICA, 14);
+                content.newLineAtOffset(72, 700);
+                content.showText("Check terminology in this translation sample.");
+                content.endText();
+                content.beginText();
+                content.setFont(PDType1Font.HELVETICA, 10);
+                content.newLineAtOffset(72, 665);
+                content.showText(activityNumber + " - " + projectName.replace("Demo · ", ""));
+                content.endText();
+            }
+            document.save(bytes);
+            return bytes.toByteArray();
         }
     }
 
@@ -235,12 +361,6 @@ public class DemoDataConfig implements ApplicationRunner {
         activityTranslatorRepository.save(new ActivityTranslator(activity, translator, assignAsResponsible, assignedDate));
     }
 
-    private void assignEditorIfMissing(Project project, User editor) {
-        if (!projectChiefEditorRepository.existsByProjectIdAndChiefEditorId(project.getId(), editor.getId())) {
-            projectChiefEditorRepository.save(new ProjectChiefEditor(project, editor, true));
-        }
-    }
-
     private void recordIfMissing(
             Activity activity,
             User translator,
@@ -281,6 +401,33 @@ public class DemoDataConfig implements ApplicationRunner {
                 "Add this week's remaining-volume estimate for " + reminderActivity.getActivityNumber() + ".",
                 businessClock.instant()
         ));
+    }
+
+    private void seedNotificationShowcase(User maya, User manager, Activity privacyPolicy,
+                                          Activity contractAppendix, Activity launchEmails) {
+        LocalDate today = LocalDate.now(businessClock);
+        LocalDate week = today.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
+        var now = businessClock.instant();
+        notificationIfMissing(new Notification(maya, null, NotificationType.DAILY_RECORD_REMINDER,
+                today.minusDays(1), "Demo history: yesterday's daily record reminder.", now.minusSeconds(86400)));
+        notificationIfMissing(new Notification(maya, null, NotificationType.DAILY_RECORD_REMINDER,
+                today.minusDays(2), "Demo history: remember to log translated pages each day.", now.minusSeconds(172800)));
+        notificationIfMissing(new Notification(maya, privacyPolicy, NotificationType.WEEKLY_ESTIMATE_REMINDER,
+                week, "Demo: update the remaining pages for " + privacyPolicy.getActivityNumber() + ".", now.minusSeconds(7200)));
+        notificationIfMissing(new Notification(maya, launchEmails, NotificationType.WEEKLY_ESTIMATE_REMINDER,
+                week, "Demo: check this week's estimate for " + launchEmails.getActivityNumber() + ".", now.minusSeconds(10800)));
+        notificationIfMissing(new Notification(maya, privacyPolicy, NotificationType.WEEKLY_SUBMISSION_REMINDER,
+                week, "Demo: submit a weekly version for " + privacyPolicy.getActivityNumber() + ".", now.minusSeconds(14400)));
+        notificationIfMissing(new Notification(maya, launchEmails, NotificationType.WEEKLY_SUBMISSION_REMINDER,
+                week, "Demo: the weekly version for " + launchEmails.getActivityNumber() + " is due.", now.minusSeconds(18000)));
+        notificationIfMissing(new Notification(maya, contractAppendix, NotificationType.CORRECTION_REQUESTED,
+                week, "Demo: Chief Editor requested corrections for " + contractAppendix.getActivityNumber() + ".", now.minusSeconds(21600)));
+        notificationIfMissing(new Notification(maya, privacyPolicy, NotificationType.RECORD_EDIT_APPROVED,
+                week.minusWeeks(1), "Demo history: a daily record edit was approved for " + privacyPolicy.getActivityNumber() + ".", now.minusSeconds(259200)));
+        notificationIfMissing(new Notification(maya, launchEmails, NotificationType.RECORD_EDIT_REJECTED,
+                week.minusWeeks(1), "Demo history: a daily record edit was declined for " + launchEmails.getActivityNumber() + ".", now.minusSeconds(345600)));
+        notificationIfMissing(new Notification(manager, privacyPolicy, NotificationType.RECORD_EDIT_REQUESTED,
+                week.minusWeeks(1), "Demo history: Maya requested a daily record edit for " + privacyPolicy.getActivityNumber() + ".", now.minusSeconds(432000)));
     }
 
     private void estimateIfMissing(

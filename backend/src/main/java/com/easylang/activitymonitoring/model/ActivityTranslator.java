@@ -37,6 +37,9 @@ public class ActivityTranslator {
     @Column(name = "is_responsible", nullable = false)
     private boolean responsible;
 
+    @Column(name = "responsible_activity_id")
+    private Long responsibleActivityId;
+
     @Column(name = "assigned_date", nullable = false)
     private LocalDate assignedDate;
 
@@ -47,6 +50,7 @@ public class ActivityTranslator {
         this.activity = activity;
         this.translator = translator;
         this.responsible = responsible;
+        this.responsibleActivityId = responsible ? activity.getId() : null;
         this.assignedDate = assignedDate;
     }
 
@@ -68,6 +72,7 @@ public class ActivityTranslator {
 
     public void setResponsible(boolean responsible) {
         this.responsible = responsible;
+        this.responsibleActivityId = responsible ? activity.getId() : null;
     }
 
     public LocalDate getAssignedDate() {

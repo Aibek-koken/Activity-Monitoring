@@ -3,6 +3,7 @@ import { defineConfig } from '@playwright/test'
 export default defineConfig({
   testDir: './e2e',
   fullyParallel: false,
+  timeout: 240_000,
   workers: 2,
   retries: 0,
   reporter: 'list',
@@ -10,11 +11,12 @@ export default defineConfig({
     timeout: 15_000,
   },
   use: {
-    baseURL: 'http://127.0.0.1:5173',
+    baseURL: process.env.E2E_BASE_URL ?? 'http://127.0.0.1:5173',
     browserName: 'chromium',
     headless: true,
     launchOptions: {
-      executablePath: '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
+      executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE
+        ?? '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
     },
     screenshot: 'only-on-failure',
     trace: 'retain-on-failure',

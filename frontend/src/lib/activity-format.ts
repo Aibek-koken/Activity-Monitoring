@@ -34,6 +34,13 @@ export function formatVolume(value: number | string | null | undefined): string 
   }).format(amount)
 }
 
+export function formatCheckingTime(value: number | string | null | undefined): string {
+  const totalMinutes = Math.round((toNumberOrNull(value) ?? 0) * 60)
+  const hours = Math.floor(totalMinutes / 60)
+  const minutes = totalMinutes % 60
+  return [hours > 0 ? `${hours} h` : '', minutes > 0 ? `${minutes} min` : ''].filter(Boolean).join(' ') || '0 min'
+}
+
 export function formatDate(value: string | null | undefined): string {
   if (!value) return 'No records yet'
   const date = new Date(`${value}T00:00:00Z`)
@@ -96,4 +103,9 @@ export function formatWorkHours(value: number | string | null | undefined): stri
 
 export function statusClassName(status: ActivityStatus): string {
   return `status-pill status-pill--${status.toLowerCase().replaceAll('_', '-')}`
+}
+
+export function formatPages(value: number | string | null | undefined): string {
+  const amount = toNumberOrNull(value) ?? 0
+  return `${formatVolume(amount)} ${amount === 1 ? 'page' : 'pages'}`
 }

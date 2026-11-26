@@ -22,6 +22,8 @@ vi.mock('../lib/api', () => ({
   reminderApi: {
     list: vi.fn(),
     markRead: vi.fn(),
+    markAllRead: vi.fn(),
+    delete: vi.fn(),
   },
   translatorActivityApi: {
     list: vi.fn(),
@@ -67,6 +69,7 @@ describe('TranslatorActivitiesPage', () => {
     vi.mocked(reminderApi.list).mockResolvedValue({ reminders: [] })
     vi.mocked(reminderApi.markRead).mockReset()
     vi.mocked(reminderApi.markRead).mockResolvedValue(undefined)
+    vi.mocked(reminderApi.markAllRead).mockResolvedValue(undefined)
   })
 
   afterEach(() => {
@@ -90,41 +93,38 @@ describe('TranslatorActivitiesPage', () => {
 
     expect(screen.getByText('Privacy policy translation')).toBeInTheDocument()
     expect(screen.getByText('EL-2026-001')).toBeInTheDocument()
-    expect(screen.getAllByText('20.75 units')).toHaveLength(1)
+    expect(screen.getAllByText('20.75 pages')).toHaveLength(1)
     expect(screen.getByText(/Logged by you/)).toBeInTheDocument()
     expect(screen.queryByText('Shown')).not.toBeInTheDocument()
   })
 
-  it('shows daily and weekly notifications in the top-right notification panel', async () => {
+  it('shows daily, weekly, and correction notifications in the top-right notification panel', async () => {
     vi.mocked(translatorActivityApi.list).mockResolvedValue({ activities: assignedActivities })
     vi.mocked(reminderApi.list).mockResolvedValue({ reminders: [
       { id: 1, type: 'DAILY_RECORD_REMINDER', periodDate: '2026-10-23', message: "Record today's translated volume.", createdAt: '2026-10-23T13:00:00Z' },
       { id: 2, type: 'WEEKLY_ESTIMATE_REMINDER', periodDate: '2026-10-19', message: 'Add an estimate for EL-2026-001.', activityId: 101, activityNumber: 'EL-2026-001', createdAt: '2026-10-23T13:00:00Z' },
       { id: 3, type: 'WEEKLY_ESTIMATE_REMINDER', periodDate: '2026-10-19', message: 'Add an estimate for EL-2026-002.', activityId: 102, activityNumber: 'EL-2026-002', createdAt: '2026-10-23T13:00:00Z' },
+      { id: 4, type: 'CORRECTION_REQUESTED', periodDate: '2026-10-23', message: 'Corrections requested for EL-2026-001', activityId: 101, activityNumber: 'EL-2026-001', createdAt: '2026-10-23T13:00:00Z' },
     ] })
 
     renderPage('/translator?assignment=responsible')
     await runDebouncedLoad()
-    expect(screen.getByRole('button', { name: 'Notifications, 3 unread' })).toHaveAttribute('aria-expanded', 'false')
-    fireEvent.click(screen.getByRole('button', { name: 'Notifications, 3 unread' }))
+    expect(screen.getByRole('button', { name: 'Notifications, 4 unread' })).toHaveAttribute('aria-expanded', 'false')
+    fireEvent.click(screen.getByRole('button', { name: 'Notifications, 4 unread' }))
     expect(screen.getByRole('heading', { name: 'Notifications' })).toBeInTheDocument()
     expect(screen.getByText('Daily record')).toBeInTheDocument()
     expect(screen.getAllByText('Weekly estimate')).toHaveLength(2)
-    expect(screen.getByText("Record today's translated volume.").closest('a')).toHaveAttribute('href', '/translator?assignment=responsible#activity-list')
-    expect(screen.getByText('Add an estimate for EL-2026-001.').closest('a')).toHaveAttribute('href', '/translator/activities/101?assignment=responsible#weekly-estimate')
-
-    fireEvent.click(screen.getByText("Record today's translated volume."))
+    expect(screen.getByText('Correction requested')).toBeInTheDocument()
+    const dailyItem = screen.getByText("Record today's translated volume.").closest('li')!
+    fireEvent.click(within(dailyItem).getByRole('button', { name: 'Read details ›' }))
     await act(async () => {})
     expect(reminderApi.markRead).toHaveBeenCalledWith(1)
-    expect(screen.queryByText("Record today's translated volume.")).not.toBeInTheDocument()
-
-    fireEvent.click(screen.getByRole('button', { name: 'Notifications, 2 unread' }))
-
-    const firstWeeklyNotification = screen.getByText('Add an estimate for EL-2026-001.').closest('li')
-    fireEvent.click(within(firstWeeklyNotification!).getByRole('button', { name: 'Mark weekly estimate notification read' }))
+    expect(screen.getByRole('link', { name: 'Open activity' })).toHaveAttribute('href', '/translator?assignment=responsible#activity-list')
+    expect(dailyItem).toHaveClass('notification-item--read')
+    expect(screen.getAllByText("Record today's translated volume.")).toHaveLength(2)
+    fireEvent.click(screen.getByRole('button', { name: 'Delete' }))
     await act(async () => {})
-    expect(reminderApi.markRead).toHaveBeenCalledWith(2)
-    expect(screen.queryByText('Add an estimate for EL-2026-001.')).not.toBeInTheDocument()
+    expect(screen.queryByText("Record today's translated volume.")).not.toBeInTheDocument()
     expect(screen.getByText('Add an estimate for EL-2026-002.')).toBeInTheDocument()
   })
 
@@ -203,7 +203,7 @@ describe('TranslatorActivitiesPage', () => {
     )
   })
 
-  it('hides finished activities from quick views and shows them through the status filter', async () => {
+  it('shows finished activities in quick views and hides under-checking activities unless filtered', async () => {
     const finishedActivity: ActivitySummary = {
       ...assignedActivities[0],
       activityName: 'Completed policy translation',
@@ -211,24 +211,36 @@ describe('TranslatorActivitiesPage', () => {
       id: 109,
       status: 'FINISHED',
     }
-    vi.mocked(translatorActivityApi.list).mockResolvedValue({ activities: [...assignedActivities, finishedActivity] })
+    const underCheckingActivity: ActivitySummary = {
+      ...assignedActivities[0],
+      activityName: 'Submitted policy translation',
+      activityNumber: 'EL-2026-010',
+      id: 110,
+      status: 'UNDER_CHECKING',
+    }
+    vi.mocked(translatorActivityApi.list).mockResolvedValue({
+      activities: [...assignedActivities, finishedActivity, underCheckingActivity],
+    })
 
     renderPage()
     await runDebouncedLoad()
 
     expect(screen.getByText('Privacy policy translation')).toBeInTheDocument()
-    expect(screen.queryByText('Completed policy translation')).not.toBeInTheDocument()
+    expect(screen.getByText('Completed policy translation')).toBeInTheDocument()
+    expect(screen.queryByText('Submitted policy translation')).not.toBeInTheDocument()
 
     fireEvent.click(screen.getByRole('button', { name: 'Responsible' }))
-    expect(screen.queryByText('Completed policy translation')).not.toBeInTheDocument()
+    expect(screen.getByText('Completed policy translation')).toBeInTheDocument()
+    expect(screen.queryByText('Submitted policy translation')).not.toBeInTheDocument()
 
     fireEvent.click(screen.getByRole('button', { name: 'More filters' }))
-    expect(screen.getByLabelText('Status')).toHaveDisplayValue('Exclude finished')
-    fireEvent.change(screen.getByLabelText('Status'), { target: { value: 'FINISHED' } })
+    expect(screen.getByLabelText('Status')).toHaveDisplayValue('Exclude under checking')
+    fireEvent.change(screen.getByLabelText('Status'), { target: { value: 'UNDER_CHECKING' } })
     fireEvent.click(screen.getByRole('button', { name: 'Apply filters' }))
 
-    expect(screen.getByText('Completed policy translation')).toBeInTheDocument()
+    expect(screen.getByText('Submitted policy translation')).toBeInTheDocument()
     expect(screen.queryByText('Privacy policy translation')).not.toBeInTheDocument()
+    expect(screen.queryByText('Completed policy translation')).not.toBeInTheDocument()
   })
 
   it('keeps the role filter selected when search changes', async () => {

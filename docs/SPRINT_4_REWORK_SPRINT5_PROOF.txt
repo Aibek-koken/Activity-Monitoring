@@ -1,0 +1,34 @@
+Sprint 5 unchanged proof (online downloaded after update)
+Sheets before: ['main', 'User Story1', 'US1QATest', 'User Story 2', 'US2QATest', '...', 'Source Notes', 'Sprint 6 Integration', 'Week 4 Plan']
+Sheets after : ['main', 'User Story1', 'US1QATest', 'User Story 2', 'US2QATest', '...', 'Source Notes', 'Sprint 6 Integration', 'Week 4 Plan', 'Sprint 4 QA']
+Rows 26-38 (US-24 through US-36): values, formulas, styles identical
+Row heights 26-38 identical: True
+Column widths identical: True
+Freeze panes identical: True
+AutoFilter identical: True
+Merged ranges identical: True
+Images identical: True
+Sheet User Story1: identical=True
+Sheet US1QATest: identical=True
+Sheet User Story 2: identical=True
+Sheet US2QATest: identical=True
+Sheet ...: identical=True
+Sheet Source Notes: identical=True
+Sheet Sprint 6 Integration: identical=True
+Sheet Week 4 Plan: identical=True
+Sprint 5 proof: PASS
+New/changed Sprint 4 rows:
+  Row 15: A=13 B=Receive Correction Request
+  Row 16: A=14 B=Correct Translation
+  Row 17: A=15 B=View Assigned Project
+  Row 18: A=16 B=View Submitted Translations
+  Row 19: A=17 B=Check Translation and Decide
+  Row 20: A=18 B=Specify Checking Time
+  Row 21: A=19 B=Record Review Result (included in US-17)
+  Row 22: A=20 B=Record Mistakes (included in US-17)
+  Row 23: A=21 B=Send Version for Correction (included in US-17)
+  Row 24: A=22 B=Approve Corrected Version (included in US-17)
+  Row 25: A=23 B=View Checking Workload
+  Row 40: A=S4-A B=Send Weekly Translation Version
+  Row 41: A=S4-B B=Track Pages and Rework
+Sprint 4 QA sheet present: True

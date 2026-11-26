@@ -58,4 +58,14 @@ public class ProjectChiefEditor {
     public boolean isResponsible() {
         return responsible;
     }
+
+    public void makeResponsible() {
+        this.responsible = true;
+        this.responsibleProjectId = project.getId();
+    }
+
+    public void makeAssistant() {
+        this.responsible = false;
+        this.responsibleProjectId = null;
+    }
 }

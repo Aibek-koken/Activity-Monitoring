@@ -77,6 +77,22 @@ FROM (
 JOIN app_users mgr ON mgr.email = seed.manager_email
 ON CONFLICT (project_name) DO NOTHING;
 
+-- Enable the finish-to-document-submission demo for EL-2026-106.
+INSERT INTO project_chief_editors (project_id, chief_editor_id, is_responsible, responsible_project_id)
+SELECT p.id, u.id, TRUE, p.id
+FROM projects p
+JOIN app_users u ON u.email = 'editor2@easylang.local'
+WHERE p.project_name = 'Medical Device Manuals'
+  AND NOT EXISTS (
+      SELECT 1 FROM project_chief_editors existing
+      WHERE existing.responsible_project_id = p.id
+  )
+  AND NOT EXISTS (
+      SELECT 1 FROM project_chief_editors current_editor
+      WHERE current_editor.chief_editor_id = u.id
+        AND current_editor.is_responsible = TRUE
+  );
+
 -- -----------------------------------------------------------------------------
 -- 3. Activities
 --    Statuses are spread over the full enum so filtering/status pills are visible.

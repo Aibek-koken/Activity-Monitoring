@@ -14,6 +14,7 @@ import com.easylang.activitymonitoring.repository.ProjectRepository;
 import com.easylang.activitymonitoring.repository.ReviewRepository;
 import com.easylang.activitymonitoring.repository.UserRepository;
 import com.easylang.activitymonitoring.repository.WeeklyEstimateRepository;
+import com.easylang.activitymonitoring.storage.PrivateDocumentStorageService;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
@@ -31,6 +32,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 
 @SpringBootTest
@@ -45,12 +47,18 @@ class TranslatorSprint3PostgresConcurrencyTest {
     @Autowired private UserRepository userRepository;
     @Autowired private WeeklyEstimateRepository estimateRepository;
     @Autowired private ReviewRepository reviewRepository;
+    @Autowired private PrivateDocumentStorageService documentStorage;
 
     private Long activityId;
 
     @AfterEach
     void clean() {
-        if (activityId != null) activityRepository.deleteById(activityId);
+        if (activityId != null) {
+            reviewRepository.findByActivityIdOrderByCycleNumberDesc(activityId).stream()
+                    .filter(review -> review.getDocumentStorageKey() != null)
+                    .forEach(review -> documentStorage.deleteIfExists(review.getDocumentStorageKey()));
+            activityRepository.deleteById(activityId);
+        }
     }
 
     @Test
@@ -81,11 +89,29 @@ class TranslatorSprint3PostgresConcurrencyTest {
         assertEquals(ActivityStatus.FINISHED, activityRepository.findById(activityId).orElseThrow().getStatus());
 
         assertEquals(List.of(200, 409), concurrently(
-                () -> statusOf(() -> progressService.submitForChecking(translator.getId(), activityId)),
-                () -> statusOf(() -> progressService.submitForChecking(translator.getId(), activityId))
+                () -> statusOf(() -> progressService.submitForChecking(translator.getId(), activityId, validPdf())),
+                () -> statusOf(() -> progressService.submitForChecking(translator.getId(), activityId, validPdf()))
         ).stream().sorted().toList());
         assertEquals(ActivityStatus.UNDER_CHECKING, activityRepository.findById(activityId).orElseThrow().getStatus());
         assertEquals(1, reviewRepository.countByActivityId(activityId));
+    }
+
+    private MockMultipartFile validPdf() {
+        String header = "%PDF-1.4\n";
+        int catalogOffset = header.length();
+        String catalog = "1 0 obj\n<</Type /Catalog /Pages 2 0 R>>\nendobj\n";
+        int pagesOffset = catalogOffset + catalog.length();
+        String pages = "2 0 obj\n<</Type /Pages /Kids [] /Count 0>>\nendobj\n";
+        int xrefOffset = pagesOffset + pages.length();
+        String xref = "xref\n0 3\n0000000000 65535 f \n"
+                + String.format(java.util.Locale.ROOT, "%010d 00000 n \n", catalogOffset)
+                + String.format(java.util.Locale.ROOT, "%010d 00000 n \n", pagesOffset);
+        String trailer = "trailer\n<</Size 3 /Root 1 0 R>>\nstartxref\n" + xrefOffset + "\n%%EOF\n";
+        return new MockMultipartFile(
+                "file", "translation.pdf", "application/pdf",
+                (header + catalog + pages + xref + trailer)
+                        .getBytes(java.nio.charset.StandardCharsets.US_ASCII)
+        );
     }
 
     private int statusOf(Runnable operation) {
