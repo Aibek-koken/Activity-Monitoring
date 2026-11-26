@@ -52,13 +52,18 @@ public class Notification {
     @Column(name = "read_at")
     private Instant readAt;
 
+    @Column(name = "deleted_at")
+    private Instant deletedAt;
+
     protected Notification() {
     }
 
     public Notification(User user, Activity activity, NotificationType type, LocalDate periodDate,
                         String message, Instant createdAt) {
         if ((type == NotificationType.DAILY_RECORD_REMINDER) != (activity == null)) {
-            throw new IllegalArgumentException("Daily reminders must be user-level and weekly reminders activity-level");
+            throw new IllegalArgumentException(
+                    "Daily reminders must be user-level and activity notifications must reference an activity"
+            );
         }
         this.user = user;
         this.activity = activity;
@@ -69,11 +74,44 @@ public class Notification {
         this.createdAt = createdAt;
     }
 
+    public static Notification correctionRequested(
+            User user,
+            Activity activity,
+            long reviewId,
+            LocalDate periodDate,
+            String message,
+            Instant createdAt
+    ) {
+        if (reviewId <= 0) {
+            throw new IllegalArgumentException("Review id must be positive");
+        }
+        Notification notification = new Notification(
+                user, activity, NotificationType.CORRECTION_REQUESTED, periodDate, message, createdAt
+        );
+        notification.dedupeKey = "review:" + reviewId + ":correction-requested";
+        return notification;
+    }
+
     public void markRead(Instant now) {
         if (!read) {
             read = true;
             readAt = now;
         }
+    }
+
+    public void delete(Instant now) {
+        deletedAt = now;
+    }
+
+    public Instant getDeletedAt() {
+        return deletedAt;
+    }
+
+    public static Notification recordEdit(User user, Activity activity, NotificationType type,
+                                          long requestId, LocalDate day, String message, Instant now) {
+        Notification notification = new Notification(user, activity, type, day, message, now);
+        notification.dedupeKey = "record-edit:" + requestId + ":" + type;
+        return notification;
     }
 
     public Long getId() {

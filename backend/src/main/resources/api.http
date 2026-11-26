@@ -191,7 +191,14 @@ X-XSRF-TOKEN: ВСТАВЬ_CSRF_TOKEN_ИЗ_ПРЕДЫДУЩЕГО_ОТВЕТА
 ### 26. Submit for Chief Editor checking; creates Review cycle 1
 POST {{baseUrl}}/v1/translator/activities/{{activityId}}/submit-for-checking
 X-XSRF-TOKEN: ВСТАВЬ_CSRF_TOKEN_ИЗ_ПРЕДЫДУЩЕГО_ОТВЕТА
+Content-Type: multipart/form-data; boundary=EasyLangBoundary
 
+--EasyLangBoundary
+Content-Disposition: form-data; name="file"; filename="translation.pdf"
+Content-Type: application/pdf
+
+< ./translation.pdf
+--EasyLangBoundary--
 
 ### 27. List unread, still-relevant reminders
 GET {{baseUrl}}/v1/translator/reminders

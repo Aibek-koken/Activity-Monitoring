@@ -45,6 +45,13 @@ public class WorkRecord {
     @Column(name = "work_hours", precision = 5, scale = 2)
     private BigDecimal workHours;
 
+    @Column(name = "rework_pages", nullable = false, precision = 10, scale = 2)
+    private BigDecimal reworkPages = BigDecimal.ZERO;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "rework_review_id")
+    private Review reworkReview;
+
     @Column(name = "created_at", nullable = false)
     private Instant createdAt = Instant.now();
 
@@ -68,9 +75,26 @@ public class WorkRecord {
         this.workHours = workHours;
     }
 
-    public void updateWork(BigDecimal translatedVolume, BigDecimal workHours) {
+    public WorkRecord(
+            Activity activity,
+            User translator,
+            LocalDate recordDate,
+            BigDecimal translatedVolume,
+            BigDecimal workHours,
+            BigDecimal reworkPages,
+            Review reworkReview
+    ) {
+        this(activity, translator, recordDate, translatedVolume, workHours);
+        this.reworkPages = reworkPages == null ? BigDecimal.ZERO : reworkPages;
+        this.reworkReview = reworkReview;
+    }
+
+    public void updateWork(BigDecimal translatedVolume, BigDecimal workHours,
+                           BigDecimal reworkPages, Review reworkReview) {
         this.translatedVolume = translatedVolume;
         this.workHours = workHours;
+        this.reworkPages = reworkPages == null ? BigDecimal.ZERO : reworkPages;
+        this.reworkReview = reworkReview;
         this.updatedAt = Instant.now();
     }
 
@@ -96,6 +120,14 @@ public class WorkRecord {
 
     public BigDecimal getWorkHours() {
         return workHours;
+    }
+
+    public BigDecimal getReworkPages() {
+        return reworkPages;
+    }
+
+    public Review getReworkReview() {
+        return reworkReview;
     }
 
     public Instant getCreatedAt() {

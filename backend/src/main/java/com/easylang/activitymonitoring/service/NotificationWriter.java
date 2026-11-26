@@ -19,4 +19,9 @@ public class NotificationWriter {
     public void insert(Notification notification) {
         notificationRepository.saveAndFlush(notification);
     }
+
+    @Transactional
+    public void insertInCurrentTransaction(Notification notification) {
+        notificationRepository.saveAndFlush(notification);
+    }
 }

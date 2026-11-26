@@ -3,12 +3,14 @@ package com.easylang.activitymonitoring.service;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.easylang.activitymonitoring.model.Activity;
+import com.easylang.activitymonitoring.model.Notification;
 import com.easylang.activitymonitoring.model.NotificationType;
 import com.easylang.activitymonitoring.model.User;
 import com.easylang.activitymonitoring.model.WeeklyEstimate;
@@ -41,6 +43,7 @@ import org.springframework.http.MediaType;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 @SpringBootTest
@@ -88,21 +91,22 @@ class ReminderServiceIntegrationTest {
         clock.set(Instant.parse("2026-10-23T11:00:00Z")); // Friday 16:00
         reminderService.evaluateDueReminders();
         reminderService.evaluateDueReminders();
-        assertEquals(3, notificationRepository.count());
+        assertEquals(6, notificationRepository.count());
         assertEquals(3, notificationRepository.findDedupeKeys(NotificationType.WEEKLY_ESTIMATE_REMINDER, WEEK_START).size());
+        assertEquals(3, notificationRepository.findDedupeKeys(NotificationType.WEEKLY_SUBMISSION_REMINDER, WEEK_START).size());
 
         clock.set(Instant.parse("2026-10-23T13:00:00Z")); // Friday 18:00
         reminderService.evaluateDueReminders();
         reminderService.evaluateDueReminders();
-        assertEquals(5, notificationRepository.count());
+        assertEquals(8, notificationRepository.count());
         assertEquals(2, notificationRepository.findDedupeKeys(NotificationType.DAILY_RECORD_REMINDER, FRIDAY).size());
 
         Long mayaId = userRepository.findByEmailIgnoreCase("translator@easylang.local").orElseThrow().getId();
-        assertEquals(3, reminderService.listVisible(mayaId).reminders().size());
+        assertEquals(5, reminderService.listVisible(mayaId).reminders().size());
         clock.set(Instant.parse("2026-10-24T13:00:00Z")); // Saturday
         reminderService.evaluateDueReminders();
-        assertEquals(5, notificationRepository.count());
-        assertEquals(2, reminderService.listVisible(mayaId).reminders().size()); // yesterday's daily reminder is stale
+        assertEquals(8, notificationRepository.count());
+        assertEquals(4, reminderService.listVisible(mayaId).reminders().size()); // yesterday's daily reminder is stale
     }
 
     @Test
@@ -111,17 +115,17 @@ class ReminderServiceIntegrationTest {
         reminderService.evaluateDueReminders();
         User maya = userRepository.findByEmailIgnoreCase("translator@easylang.local").orElseThrow();
         Activity activity = activityRepository.findByActivityNumber("EL-2026-001").orElseThrow();
-        assertEquals(3, reminderService.listVisible(maya.getId()).reminders().size());
+        assertEquals(5, reminderService.listVisible(maya.getId()).reminders().size());
 
         createdRecordId = recordRepository.saveAndFlush(new WorkRecord(
                 activity, maya, FRIDAY, new BigDecimal("1.00"), null
         )).getId();
-        assertEquals(2, reminderService.listVisible(maya.getId()).reminders().size());
+        assertEquals(4, reminderService.listVisible(maya.getId()).reminders().size());
 
         createdEstimateId = estimateRepository.saveAndFlush(new WeeklyEstimate(
                 activity, maya, WEEK_START, new BigDecimal("15.00"), clock.instant()
         )).getId();
-        assertEquals(1, reminderService.listVisible(maya.getId()).reminders().size());
+        assertEquals(3, reminderService.listVisible(maya.getId()).reminders().size());
     }
 
     @Test
@@ -136,7 +140,7 @@ class ReminderServiceIntegrationTest {
 
         Cookie translatorCookie = login("translator@easylang.local");
         mockMvc.perform(get("/api/v1/translator/reminders").cookie(translatorCookie))
-                .andExpect(status().isOk()).andExpect(jsonPath("$.reminders.length()").value(3));
+                .andExpect(status().isOk()).andExpect(jsonPath("$.reminders.length()").value(5));
         mockMvc.perform(patch("/api/v1/translator/reminders/{id}/read", mayaReminderId).cookie(translatorCookie))
                 .andExpect(status().isForbidden());
 
@@ -147,11 +151,75 @@ class ReminderServiceIntegrationTest {
         mockMvc.perform(patch("/api/v1/translator/reminders/{id}/read", mayaReminderId)
                         .cookie(translatorCookie, csrf.cookie()).header(csrf.headerName(), csrf.token()))
                 .andExpect(status().isNoContent());
-        assertEquals(2, reminderService.listVisible(mayaId).reminders().size());
+        assertEquals(4, reminderService.listVisible(mayaId).reminders().size());
 
         Cookie managerCookie = login("manager@easylang.local");
         mockMvc.perform(get("/api/v1/translator/reminders").cookie(managerCookie))
                 .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void notificationHistoryRetainsReadItemsUntilOwnerDeletesThem() throws Exception {
+        clock.set(Instant.parse("2026-10-23T13:00:00Z"));
+        reminderService.evaluateDueReminders();
+        Long mayaId = userRepository.findByEmailIgnoreCase("translator@easylang.local").orElseThrow().getId();
+        Long raviId = userRepository.findByEmailIgnoreCase("translator2@easylang.local").orElseThrow().getId();
+        Long mayaNotificationId = reminderService.listVisible(mayaId).reminders().get(0).id();
+        Long raviNotificationId = reminderService.listVisible(raviId).reminders().get(0).id();
+        Cookie translatorCookie = login("translator@easylang.local");
+        Csrf csrf = csrf();
+
+        mockMvc.perform(patch("/api/v1/notifications/{id}/read", mayaNotificationId)
+                        .cookie(translatorCookie, csrf.cookie()).header(csrf.headerName(), csrf.token()))
+                .andExpect(status().isNoContent());
+        clock.set(Instant.parse("2026-10-24T13:00:00Z"));
+        mockMvc.perform(get("/api/v1/notifications").cookie(translatorCookie))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalElements").value(5))
+                .andExpect(jsonPath("$.notifications[?(@.id == " + mayaNotificationId + ")].readAt").exists());
+        mockMvc.perform(patch("/api/v1/notifications/read-all")
+                        .cookie(translatorCookie, csrf.cookie()).header(csrf.headerName(), csrf.token()))
+                .andExpect(status().isNoContent());
+        mockMvc.perform(get("/api/v1/notifications").cookie(translatorCookie))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.unreadCount").value(0));
+        mockMvc.perform(delete("/api/v1/notifications/{id}", raviNotificationId)
+                        .cookie(translatorCookie, csrf.cookie()).header(csrf.headerName(), csrf.token()))
+                .andExpect(status().isNotFound());
+        mockMvc.perform(delete("/api/v1/notifications/{id}", mayaNotificationId)
+                        .cookie(translatorCookie, csrf.cookie()).header(csrf.headerName(), csrf.token()))
+                .andExpect(status().isNoContent());
+        mockMvc.perform(get("/api/v1/notifications").cookie(translatorCookie))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.totalElements").value(4));
+        org.junit.jupiter.api.Assertions.assertNotNull(notificationRepository.findById(mayaNotificationId)
+                .orElseThrow().getDeletedAt());
+    }
+
+    @Test
+    @Transactional
+    void correctionNotificationIsVisibleOnlyToResponsibleTranslatorWhileCorrectionIsRequired() {
+        User maya = userRepository.findByEmailIgnoreCase("translator@easylang.local").orElseThrow();
+        User ravi = userRepository.findByEmailIgnoreCase("translator2@easylang.local").orElseThrow();
+        Activity activity = activityRepository.findByActivityNumber("EL-2026-002").orElseThrow();
+        activity.finish();
+        activity.submitForChecking();
+        activity.requestCorrection();
+        notificationRepository.saveAndFlush(Notification.correctionRequested(
+                maya,
+                activity,
+                987L,
+                FRIDAY,
+                "Corrections requested for EL-2026-002 (cycle 1).",
+                clock.instant()
+        ));
+
+        var visible = reminderService.listVisible(maya.getId()).reminders();
+        assertEquals(1, visible.size());
+        assertEquals(NotificationType.CORRECTION_REQUESTED, visible.get(0).type());
+        assertEquals(activity.getId(), visible.get(0).activityId());
+        assertEquals(0, reminderService.listVisible(ravi.getId()).reminders().size());
+
+        activity.resubmitForChecking();
+        assertEquals(0, reminderService.listVisible(maya.getId()).reminders().size());
     }
 
     private Cookie login(String email) throws Exception {

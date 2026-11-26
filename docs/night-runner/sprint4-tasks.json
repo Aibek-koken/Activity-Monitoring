@@ -1,0 +1,69 @@
+{
+  "version": 1,
+  "tasks": [
+    {
+      "id": "EL4-01",
+      "title": "V5 schema and private immutable file storage",
+      "stories": ["US-17", "US-19", "US-20"],
+      "scope": "Inspect V4 and existing models. Add compatible V5 Flyway migration, Review document metadata and expected time/decision fields, correction notification type, private storage service and focused migration/storage tests. Preserve fileless Sprint 3 rows and never modify V1–V4.",
+      "allowed": ["backend/**", "docs/STATE.md"],
+      "validation": ["cd backend && mvn test"]
+    },
+    {
+      "id": "EL4-02",
+      "title": "Translator file submission and legacy attachment",
+      "stories": ["US-14", "US-17"],
+      "scope": "Change existing submit API to multipart PDF/DOCX with transactional Activity lock and one Review cycle; add one-time file attachment for an existing open fileless Sprint 3 Review; add authorized original download and translator history API. Enforce responsible ownership, CSRF, safe file handling, no post-submit replacement and duplicate-submit safety. Add meaningful backend tests.",
+      "allowed": ["backend/**", "docs/STATE.md"],
+      "validation": ["cd backend && mvn test"]
+    },
+    {
+      "id": "EL4-03",
+      "title": "Chief Editor decisions and correction cycle",
+      "stories": ["US-13", "US-14", "US-18", "US-19", "US-20", "US-21", "US-22"],
+      "scope": "Implement assigned-editor Review detail, expected checking hours, approve/request-correction decision, responsible-translator notification, correction re-upload and next Review cycle. Closed Review result, feedback, expected time and file stay immutable. Enforce editor ownership even after project reassignment; lock/unique constraints protect concurrent requests. Add service/controller/security tests.",
+      "allowed": ["backend/**", "docs/STATE.md"],
+      "validation": ["cd backend && mvn test"]
+    },
+    {
+      "id": "EL4-04",
+      "title": "Chief Editor assigned projects, queue and workload API",
+      "stories": ["US-15", "US-16", "US-23"],
+      "scope": "Add role/ownership-scoped assigned projects, open Review queue and compact workload API: open count, known expected hours, missing-estimate count. Do not label backlog as current week without due dates. Use service/repository layers and focused pagination/query tests as needed.",
+      "allowed": ["backend/**", "docs/STATE.md"],
+      "validation": ["cd backend && mvn test"]
+    },
+    {
+      "id": "EL4-05",
+      "title": "Translator correction and document UI",
+      "stories": ["US-13", "US-14"],
+      "scope": "Integrate multipart submit, review history/download, correction feedback/notification and corrected-file re-upload in existing translator pages. Keep existing Sprint 3 flow and design tokens; no embedded editor or DOCX preview. Backend remains the authority for action permissions. Add focused UI tests.",
+      "allowed": ["frontend/**", "docs/STATE.md"],
+      "validation": ["cd frontend && npm test", "cd frontend && npm run lint", "cd frontend && npm run build"]
+    },
+    {
+      "id": "EL4-06",
+      "title": "Compact Chief Editor review UI",
+      "stories": ["US-15", "US-16", "US-17", "US-18", "US-19", "US-20", "US-21", "US-22", "US-23"],
+      "scope": "Build assigned-project view, Review queue/detail, original download, expected-time field, text feedback and Approve/Request Correction controls, plus one simple workload summary. Show history and closed states read-only. Follow docs/DESIGN.md and semantic CSS variables; avoid extra dashboard components and all in-app document editing/preview. Add UI tests.",
+      "allowed": ["frontend/**", "docs/STATE.md"],
+      "validation": ["cd frontend && npm test", "cd frontend && npm run lint", "cd frontend && npm run build"]
+    },
+    {
+      "id": "EL4-07",
+      "title": "PostgreSQL, security and isolated E2E acceptance",
+      "stories": ["US-13", "US-14", "US-15", "US-16", "US-17", "US-18", "US-19", "US-20", "US-21", "US-22", "US-23"],
+      "scope": "Add/execute meaningful PostgreSQL migration, concurrency, ownership, CSRF, file safety and cross-role E2E tests. Use isolated E2E database and bounded service startup; do not mutate developer data. Fix defects within Sprint 4 scope. Write exact commands and counts to docs/night-runner/sprint4-verification.md, including truthful standalone lines POSTGRESQL: PASS, SECURITY: PASS and E2E: PASS only after those checks actually pass. If a prerequisite is unavailable, explain it and leave the task blocked instead of claiming completion.",
+      "allowed": ["backend/**", "frontend/**", "docs/night-runner/sprint4-verification.md", "docs/STATE.md"],
+      "validation": ["cd backend && mvn test", "cd frontend && npm test", "cd frontend && npm run lint", "cd frontend && npm run build", "test -s docs/night-runner/sprint4-verification.md", "rg -q '^POSTGRESQL: PASS$' docs/night-runner/sprint4-verification.md", "rg -q '^SECURITY: PASS$' docs/night-runner/sprint4-verification.md", "rg -q '^E2E: PASS$' docs/night-runner/sprint4-verification.md"]
+    },
+    {
+      "id": "EL4-08",
+      "title": "Final documentation and Sprint 4 status",
+      "stories": ["US-13", "US-14", "US-15", "US-16", "US-17", "US-18", "US-19", "US-20", "US-21", "US-22", "US-23"],
+      "scope": "Review actual code and verification evidence. Update existing API, architecture, design, run and state docs as appropriate; create docs/SPRINT_4_STATUS.md with story-by-story outcome, schema/API/business rules, exact test results and limitations. Ensure plan vs implementation differences are explicit. Do not claim tests that did not run.",
+      "allowed": ["docs/**", "README.md"],
+      "validation": ["test -s docs/SPRINT_4_STATUS.md", "test -s docs/night-runner/sprint4-verification.md"]
+    }
+  ]
+}

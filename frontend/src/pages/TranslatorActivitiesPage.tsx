@@ -3,7 +3,7 @@ import { AlertCircle, ClipboardList, RefreshCw, Search, SlidersHorizontal } from
 import { Link, useSearchParams } from 'react-router-dom'
 import { Breadcrumbs } from '../components/Breadcrumbs'
 import { WorkspaceLayout } from '../components/WorkspaceLayout'
-import { activityStatusLabels, formatDate, formatVolume, statusClassName } from '../lib/activity-format'
+import { activityStatusLabels, formatDate, formatPages, statusClassName } from '../lib/activity-format'
 import { translatorActivityApi } from '../lib/api'
 import type { ActivityStatus, ActivitySummary } from '../types/activity'
 
@@ -86,12 +86,12 @@ export function TranslatorActivitiesPage() {
 
   const visibleActivities = useMemo(() => activities.filter((activity) => (
     (assignment === 'all' || activity.responsible === (assignment === 'responsible'))
-    && (status ? activity.status === status : activity.status !== 'FINISHED')
+    && (status ? activity.status === status : activity.status !== 'UNDER_CHECKING')
     && (!assignedFrom || activity.assignedDate >= assignedFrom)
     && (!assignedTo || activity.assignedDate <= assignedTo)
   )), [activities, assignment, status, assignedFrom, assignedTo])
-  const hasHiddenFinishedActivities = !status && activities.some((activity) => (
-    activity.status === 'FINISHED'
+  const hasHiddenUnderCheckingActivities = !status && activities.some((activity) => (
+    activity.status === 'UNDER_CHECKING'
     && (assignment === 'all' || activity.responsible === (assignment === 'responsible'))
     && (!assignedFrom || activity.assignedDate >= assignedFrom)
     && (!assignedTo || activity.assignedDate <= assignedTo)
@@ -217,7 +217,7 @@ export function TranslatorActivitiesPage() {
               <div className="field-group">
                 <label htmlFor="activity-status-filter">Status</label>
                 <select id="activity-status-filter" onChange={(event) => setDraftStatus(event.target.value as ActivityStatus | '')} value={draftStatus}>
-                  <option value="">Exclude finished</option>
+                  <option value="">Exclude under checking</option>
                   {(Object.entries(activityStatusLabels) as [ActivityStatus, string][]).map(([value, label]) => (
                     <option key={value} value={value}>{label}</option>
                   ))}
@@ -269,11 +269,11 @@ export function TranslatorActivitiesPage() {
 
         {!isLoading && !error && visibleActivities.length === 0 && (
           <section className="empty-state">
-            <h2>{hasHiddenFinishedActivities
+            <h2>{hasHiddenUnderCheckingActivities
               ? 'No current activities'
               : query.trim() || hasAdvancedFilters ? 'No matching activities' : assignment !== 'all' ? 'No activities in this role' : 'No assigned activities'}</h2>
-            <p>{hasHiddenFinishedActivities
-              ? 'Finished activities are hidden from the quick view. Open More filters and choose Finished to see them.'
+            <p>{hasHiddenUnderCheckingActivities
+              ? 'Activities under checking are hidden from the quick view. Open More filters and choose Under checking to see them.'
               : query.trim()
               ? assignment !== 'all' || hasAdvancedFilters ? 'Try a different search or filter.' : 'Try a different activity number or name.'
               : hasAdvancedFilters ? 'Try a different status or assigned-date range.'
@@ -297,7 +297,7 @@ export function TranslatorActivitiesPage() {
                   <span>{activity.responsible ? 'Responsible' : 'Assisting'}</span>
                 </span>
                 <span className="activity-row__progress">
-                  <strong>{formatVolume(activity.progress.totalTranslatedVolume)} units</strong>
+                  <strong>{formatPages(activity.progress.totalTranslatedVolume)}</strong>
                   <span>Logged by you · {formatDate(activity.progress.lastRecordDate)}</span>
                 </span>
               </Link>

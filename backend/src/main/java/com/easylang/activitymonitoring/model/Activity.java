@@ -95,6 +95,27 @@ public class Activity {
         status = ActivityStatus.UNDER_CHECKING;
     }
 
+    public void requestCorrection() {
+        if (status != ActivityStatus.UNDER_CHECKING) {
+            throw new IllegalStateException("Only an activity under checking can require correction");
+        }
+        status = ActivityStatus.CORRECTION_REQUIRED;
+    }
+
+    public void resubmitForChecking() {
+        if (status != ActivityStatus.CORRECTION_REQUIRED) {
+            throw new IllegalStateException("Only an activity requiring correction can be resubmitted");
+        }
+        status = ActivityStatus.UNDER_CHECKING;
+    }
+
+    public void completeReview() {
+        if (status != ActivityStatus.UNDER_CHECKING) {
+            throw new IllegalStateException("Only an activity under checking can be completed");
+        }
+        status = ActivityStatus.COMPLETED;
+    }
+
     public LocalDate getCreatedDate() {
         return createdDate;
     }

@@ -85,7 +85,7 @@ export function WorkspaceLayout({ role, title, navItems, children }: WorkspaceLa
           <strong>{title}</strong>
           <div className="workspace-topbar__actions">
             <span>{roleLabels[role]}</span>
-            {role === 'TRANSLATOR' && <TranslatorNotificationCenter />}
+            {(role === 'TRANSLATOR' || role === 'PROJECT_MANAGER') && <TranslatorNotificationCenter />}
           </div>
         </header>
         {children}

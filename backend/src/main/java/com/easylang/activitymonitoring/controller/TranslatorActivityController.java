@@ -10,6 +10,7 @@ import com.easylang.activitymonitoring.service.TranslatorActivityService;
 import com.easylang.activitymonitoring.service.TranslatorProgressService;
 import jakarta.validation.Valid;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -18,6 +19,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.RequestPart;
+import org.springframework.web.multipart.MultipartFile;
 
 @RestController
 @RequestMapping("/api/v1/translator/activities")
@@ -84,11 +87,30 @@ public class TranslatorActivityController {
         return translatorProgressService.finish(principal.user().getId(), activityId);
     }
 
-    @PostMapping("/{activityId}/submit-for-checking")
+    @PostMapping(value = "/{activityId}/submit-for-checking", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ActivityDetailResponse submitForChecking(
             @AuthenticationPrincipal AuthenticatedUser principal,
-            @PathVariable Long activityId
+            @PathVariable Long activityId,
+            @RequestPart("file") MultipartFile file
     ) {
-        return translatorProgressService.submitForChecking(principal.user().getId(), activityId);
+        return translatorProgressService.submitForChecking(principal.user().getId(), activityId, file);
+    }
+
+    @PostMapping(value = "/{activityId}/weekly-versions", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ActivityDetailResponse submitWeeklyVersion(
+            @AuthenticationPrincipal AuthenticatedUser principal,
+            @PathVariable Long activityId,
+            @RequestPart("file") MultipartFile file
+    ) {
+        return translatorProgressService.submitWeeklyVersion(principal.user().getId(), activityId, file);
+    }
+
+    @PostMapping(value = "/{activityId}/resubmit-for-checking", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ActivityDetailResponse resubmitForChecking(
+            @AuthenticationPrincipal AuthenticatedUser principal,
+            @PathVariable Long activityId,
+            @RequestPart("file") MultipartFile file
+    ) {
+        return translatorProgressService.resubmitForChecking(principal.user().getId(), activityId, file);
     }
 }

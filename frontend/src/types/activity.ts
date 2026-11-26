@@ -32,6 +32,7 @@ export interface WorkRecord {
   id: number
   recordDate: string
   translatedVolume: number
+  reworkPages?: number | string
   /**
    * Nullable. The API serializes with `non_null` inclusion, so the key is absent
    * rather than `null` when work hours were never entered.
@@ -45,13 +46,27 @@ export interface ActivityDetail extends ActivitySummary {
   currentWeek: { startDate: string; endDate: string }
   currentWeekEstimate?: WeeklyEstimate | null
   weeklyEstimates: WeeklyEstimate[]
+  rework?: ReworkSummary
   permissions: {
     canEditWorkRecords: boolean
     canEditWeeklyEstimate: boolean
     canFinish: boolean
     canSubmitForChecking: boolean
+    canSubmitWeeklyVersion?: boolean
     hasResponsibleChiefEditor: boolean
+    hasOpenReview?: boolean
+    hasOutstandingRework?: boolean
   }
+}
+
+export interface ReworkSummary {
+  correctionReviewId?: number | null
+  correctionPages?: number | null
+  reworkRecordedPages: number | string
+  outstandingReworkPages: number | string
+  remainingPages?: number | string | null
+  totalRemainingPages: number | string
+  hasWeeklyEstimate: boolean
 }
 
 export interface WeeklyEstimate {
@@ -65,9 +80,44 @@ export interface CreateWorkRecordPayload {
   recordDate: string
   translatedVolume: number
   workHours: number | null
+  reworkPages?: number | null
 }
 
 export interface UpdateWorkRecordPayload {
   translatedVolume: number
   workHours: number | null
+  reworkPages?: number | null
+  editRequestId?: number
+}
+
+export type ReviewResult = 'APPROVED' | 'CORRECTION_REQUESTED'
+export type ReviewKind = 'WEEKLY' | 'FINAL'
+
+export interface ReviewDocument {
+  originalName: string
+  contentType: string
+  sizeBytes: number
+  sha256: string
+  downloadUrl: string
+  annotatedDownloadUrl?: string | null
+}
+
+export interface ReviewCycle {
+  id: number
+  cycleNumber: number
+  kind?: ReviewKind
+  weekStartDate?: string | null
+  submittedAt: string
+  result?: ReviewResult | null
+  feedback?: string | null
+  expectedCheckingHours?: number | null
+  correctionPages?: number | null
+  correctionPageNumbers?: number[]
+  decidedAt?: string | null
+  annotationCount?: number
+  document?: ReviewDocument | null
+}
+
+export interface ReviewHistory {
+  reviews: ReviewCycle[]
 }
